@@ -1,33 +1,56 @@
-import telebot
-from bot_logging import LogManager
 import time
+import os
+import telebot
+
+from bot_logging import LogManager
+from bot_skills import WeatherManager, CommunicationManager
+
+# Прочитаем токен
+token_path = 'C:\\Projects'
+token = None
+with open(os.path.join(token_path, 'token.txt'), 'r') as token_file:
+    token = token_file.read()
 
 
 LogManager().start_logging()
-bot = telebot.TeleBot('820045015:AAGT5vZMYrXdynheOm9ZLCbdWYY3WbDximI')
-help_message = 'Привет!\n' \
-               'Я бета версия умного бота.\n' \
-               'Вот что я пока умею:\n' \
+bot = telebot.TeleBot(token)
+hello_message = 'Привет!\nЯ бета версия умного бота'
+help_message = 'Вот что я пока умею:\n' \
                '\n' \
-               'Отвечать на команду "Привет"\n' \
-               'Отвечать на команду "Пока"'
+               'Отвечать на приветствие\n' \
+               'Отвечать на команду "Пока"\n' \
+               'Говорить погоду /weather'
+cm = CommunicationManager()
 
 
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['start', 'help', 'weather'])
 def start_message(message):
-    time.sleep(1)
-    bot.send_message(message.chat.id, help_message)
+    if '/start' in message.text or '/help' in message.text:
+        bot.send_message(message.chat.id, cm.say_hello())
+        bot.send_message(message.chat.id, help_message)
+    elif '/weather' in message.text:
+        time.sleep(0.5)
+        bot.send_message(message.chat.id, WeatherManager().get_weather_info())
 
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-    time.sleep(1)
-    if message.text == 'Привет':
-        bot.reply_to(message, 'Привет, мой создатель')
+    time.sleep(0.5)
+    if cm.is_hello(message.text):
+        bot.send_message(message.chat.id, cm.say_hello())
     elif message.text == 'Пока':
-        bot.reply_to(message, 'Прощай, создатель')
-
-
+        bot.send_message(message.chat.id, 'Прощай, человек')
+    elif 'погод' in message.text.lower() and 'сегодня' in message.text.lower():
+        time.sleep(0.5)
+        bot.send_message(message.chat.id, WeatherManager().get_weather_info())
+    else:
+        time.sleep(1)
+        bot.send_message(message.chat.id, 'Кажется, меня такому не учили :(')
+        time.sleep(0.5)
+        bot.send_message(message.chat.id, help_message)
 
 
 bot.polling()
+
+while True:  # Don't end the main thread.
+    pass
