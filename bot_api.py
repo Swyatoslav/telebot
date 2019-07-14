@@ -1,20 +1,28 @@
 import time
 import os
 import telebot
+from bot_config import ConfigManager
+import sys
 
 from bot_logging import LogManager
 from bot_skills import WeatherManager, CommunicationManager
 
-# Прочитаем токен
-token_path = 'C:\\Projects'
-token = None
-with open(os.path.join(token_path, 'token.txt'), 'r') as token_file:
-    token = token_file.read()
 
+# Создадим конфиг
+config_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'config.ini')
+cm = ConfigManager().create_config(config_path)
 
+# Запишем токен
+with open(os.path.join(cm.get('general', 'settings_path'), 'token.txt'), 'r') as token_file:
+    token_line = token_file.read()
+    cm.set('general', 'token', token_line)
+
+# Включим логирование
 lm = LogManager()
 # lm.start_logging()
-bot = telebot.TeleBot(token)
+
+# Инициализируем бота
+bot = telebot.TeleBot(cm.get('general', 'token'))
 hello_message = 'Привет!\nЯ бета версия умного бота'
 help_message = 'Вот что я пока умею:\n' \
                '\n' \
@@ -53,7 +61,7 @@ def send_text(message):
         time.sleep(0.5)
         bot.send_message(message.chat.id, help_message)
 
-
+# Команда для запуска бота
 bot.polling()
 
 while True:  # Don't end the main thread.
