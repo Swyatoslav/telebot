@@ -12,18 +12,21 @@ with open(os.path.join(token_path, 'token.txt'), 'r') as token_file:
     token = token_file.read()
 
 
-LogManager().start_logging()
+lm = LogManager()
+# lm.start_logging()
 bot = telebot.TeleBot(token)
 hello_message = 'Привет!\nЯ бета версия умного бота'
 help_message = 'Вот что я пока умею:\n' \
                '\n' \
                'Отвечать на приветствие\n' \
                'Отвечать на команду "Пока"\n' \
-               'Говорить погоду /weather'
+               'Говорить погоду /weather\n\n' \
+               'Для повтора подсказок введите\n /help'
 cm = CommunicationManager()
 
 
 @bot.message_handler(commands=['start', 'help', 'weather'])
+@lm.log_message
 def start_message(message):
     if '/start' in message.text or '/help' in message.text:
         bot.send_message(message.chat.id, cm.say_hello())
@@ -34,6 +37,7 @@ def start_message(message):
 
 
 @bot.message_handler(content_types=['text'])
+@lm.log_message
 def send_text(message):
     time.sleep(0.5)
     if cm.is_hello(message.text):

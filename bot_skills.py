@@ -29,7 +29,7 @@ class WeatherManager:
         evening_temp = self._get_weather_info('Вечер')
         night_temp = self._get_weather_info('Ночь')
 
-        return 'Погода на сегодня такая..\nУтро: {}°\nДень: {}°\nВечер: {}°\nНочь: {}°'.format(
+        return 'Погода в Новосибирске сегодня такая..\nУтро: {}°\nДень: {}°\nВечер: {}°\nНочь: {}°'.format(
             morning_temp, day_temp, evening_temp, night_temp)
 
     def _get_weather_info(self, day_part):
@@ -106,5 +106,5 @@ class CommunicationManager:
         answer_phrases = ['Привет, человек!', 'Хееееей здорова :)', 'Я вас категорически приветствую',
                           'Привет, ты кто? Шутка, я все про тебя знаю ;)', 'Guten tag! С немецкого - Добрый день :)']
 
-        answer_num = random.randint(0, len(answer_phrases))
+        answer_num = random.randint(0, len(answer_phrases) - 1)
         return answer_phrases[answer_num]
