@@ -29,7 +29,7 @@ def start_message(message):
         bot.send_message(message.chat.id, cm.say_hello())
         bot.send_message(message.chat.id, help_message)
     elif '/weather' in message.text:
-        time.sleep(0.5)
+        bot.send_message(message.chat.id, 'Погоди, спрошу у Яндекса')
         bot.send_message(message.chat.id, WeatherManager().get_weather_info())
 
 
@@ -40,8 +40,8 @@ def send_text(message):
         bot.send_message(message.chat.id, cm.say_hello())
     elif message.text == 'Пока':
         bot.send_message(message.chat.id, 'Прощай, человек')
-    elif 'погод' in message.text.lower() and 'сегодня' in message.text.lower():
-        time.sleep(0.5)
+    elif 'погод' in message.text.lower():
+        bot.send_message(message.chat.id, 'Погоди, спрошу у Яндекса')
         bot.send_message(message.chat.id, WeatherManager().get_weather_info())
     else:
         time.sleep(1)
