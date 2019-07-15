@@ -9,7 +9,6 @@ class DBManager:
     host = 'localhost'
     cursor = None
     conn = None
-    cur_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     def __init__(self, dbname, user, password):
         self.dbname = dbname
@@ -27,16 +26,28 @@ class DBManager:
 
         return True
 
-    def set_user_info(self, message):
+    def set_user_info(self, func):
         """Метод записывает в БД инфу про юзера"""
 
-        self.cursor.execute('INSERT INTO admin.users(id, user_name, last_online) VALUES (%s, %s, %s);',
+        cur_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        def wrapper(message):
+            if not self._is_uid_exists(message.from_user.id):
+                self.cursor.execute('INSERT INTO admin.users(id, user_name, last_online) VALUES (%s, %s, %s);',
                             (message.from_user.id, message.from_user.first_name + ' ' + message.from_user.last_name,
-                             self.cur_date))
-        self.conn.commit()
+                             cur_date))
+            else:
+                self.cursor.execute('UPDATE admin.users	SET last_online=%s	WHERE id = %s',
+                                    (cur_date, message.from_user.id))
+            self.conn.commit()
+            func(message)
+
+        return wrapper
 
     def set_unknown_message_info(self, message):
         """Метод записывает информацию о нераспознанном сообщении в базу"""
+
+        cur_date =  datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         self.cursor.execute("SELECT id from admin.unknown_messages order by id desc limit 1")
         result = self.cursor.fetchone()
@@ -46,14 +57,12 @@ class DBManager:
             message_id = 1
         else:
             message_id = result[0] + 1
-        # если юзера написавшего сообщение, еще нет в базе, записываем
-        if not self._is_uid_exists(message.from_user.id):
-            self.set_user_info(message)
+
         self.cursor.execute('INSERT INTO admin.unknown_messages('
                             'id, uid, name, message, message_time)	VALUES ('
                             '%s, %s, %s, %s, %s);' , (
             message_id, message.from_user.id, message.from_user.first_name + ' ' + message.from_user.last_name,
-            message.text, self.cur_date))
+            message.text, cur_date))
 
         self.conn.commit()
 

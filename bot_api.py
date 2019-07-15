@@ -37,6 +37,7 @@ info_message = 'Вот что я пока умею:\n' \
 cm = CommunicationManager()
 
 
+@db.set_user_info
 @bot.message_handler(commands=['start', 'help', 'weather', 'secret93'])
 @lm.log_message
 def start_message(message):
@@ -55,6 +56,7 @@ def start_message(message):
 
 @bot.message_handler(content_types=['text'])
 @lm.log_message
+@db.set_user_info
 def send_text(message):
     time.sleep(0.5)
     if cm.is_hello(message.text):
