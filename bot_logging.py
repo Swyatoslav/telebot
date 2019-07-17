@@ -26,7 +26,12 @@ class LogManager:
         def wrapper(message):
             t = datetime.now()
             time_log = t.strftime("[%m-%d-%y %H:%M:%S]")
-            user_info = [message.from_user.first_name, message.from_user.last_name, message.from_user.id]
+            if message.from_user.last_name is None:
+                last_user_name = ''
+            else:
+                last_user_name = message.from_user.last_name
+
+            user_info = [message.from_user.first_name, last_user_name, message.from_user.id]
 
             print('{0}  USER: [{1} {2}]  USER_ID: [{3}]  MESSAGE: [{4}]'.format(
                 time_log, user_info[0], user_info[1], user_info[2], message.text))

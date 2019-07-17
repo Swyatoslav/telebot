@@ -1,5 +1,6 @@
-import psycopg2
 import datetime
+
+import psycopg2
 
 
 class DBManager:
@@ -34,8 +35,9 @@ class DBManager:
         def wrapper(message):
             if not self._is_uid_exists(message.from_user.id):
                 self.cursor.execute('INSERT INTO admin.users(id, user_name, last_online) VALUES (%s, %s, %s);',
-                            (message.from_user.id, message.from_user.first_name + ' ' + message.from_user.last_name,
-                             cur_date))
+                                    (message.from_user.id,
+                                     message.from_user.first_name + ' ' + message.from_user.last_name,
+                                     cur_date))
             else:
                 self.cursor.execute('UPDATE admin.users	SET last_online=%s	WHERE id = %s',
                                     (cur_date, message.from_user.id))
@@ -47,7 +49,7 @@ class DBManager:
     def set_unknown_message_info(self, message):
         """Метод записывает информацию о нераспознанном сообщении в базу"""
 
-        cur_date =  datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cur_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         self.cursor.execute("SELECT id from admin.unknown_messages order by id desc limit 1")
         result = self.cursor.fetchone()
@@ -60,9 +62,10 @@ class DBManager:
 
         self.cursor.execute('INSERT INTO admin.unknown_messages('
                             'id, uid, name, message, message_time)	VALUES ('
-                            '%s, %s, %s, %s, %s);' , (
-            message_id, message.from_user.id, message.from_user.first_name + ' ' + message.from_user.last_name,
-            message.text, cur_date))
+                            '%s, %s, %s, %s, %s);', (
+                                message_id, message.from_user.id,
+                                message.from_user.first_name + ' ' + message.from_user.last_name,
+                                message.text, cur_date))
 
         self.conn.commit()
 
@@ -88,6 +91,10 @@ class DBManager:
         self.cursor.execute('TRUNCATE admin.unknown_messages')
         self.conn.commit()
 
-        return 'Неопознанные сообщения стёрты'
-# db = DBManager('telebot', 'postgres', '89134580458Asd')
-# db.set_inknown_message_info('фигота')
+    def is_admin_id(self, user_id):
+        """Метод проверяет, id админа передано или нет"""
+
+        self.cursor.execute("SELECT id FROM admin.users WHERE user_name = 'Святослав Ященко';")
+        self.conn.commit()
+
+        return self.cursor.fetchone()[0] == user_id

@@ -1,13 +1,16 @@
-import time
 import os
-import telebot
-from bot_config import ConfigManager
 import sys
+import time
 
+import apiai
+import json
+import requests
+import telebot
+
+from bot_config import ConfigManager
+from bot_db import DBManager
 from bot_logging import LogManager
 from bot_skills import WeatherManager, CommunicationManager
-from bot_db import DBManager
-
 
 # Создадим конфиг
 config_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'config.ini')
@@ -30,15 +33,14 @@ bot = telebot.TeleBot(cm.get('general', 'token'))
 hello_message = 'Привет!\nЯ бета версия умного бота'
 info_message = 'Вот что я пока умею:\n' \
                '\n' \
-               'Отвечать на приветствие\n' \
-               'Отвечать на прощание\n' \
+               'Общаться \n' \
                'Говорить погоду /weather\n\n' \
                'Для повтора подсказок введите\n /help'
 cm = CommunicationManager()
 
 
 @db.set_user_info
-@bot.message_handler(commands=['start', 'help', 'weather', 'secret93'])
+@bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234'])
 @lm.log_message
 def start_message(message):
     if message.text in '/start':
@@ -49,9 +51,12 @@ def start_message(message):
         bot.send_message(message.chat.id, WeatherManager().get_weather_info())
     elif message.text in ['/help']:
         bot.send_message(message.chat.id, info_message)
-    elif 'secret93' in message.text:
+    elif 'qwsa1234' in message.text and message.from_user.id:
         bot.send_message(message.chat.id, 'Привет, Святослав')
-        bot.send_message(message.chat.id, 'Твои инструменты: \nвыдай неопознанные\nочисти неопознанные')
+        bot.send_message(message.chat.id, 'Твои инструменты:'
+                                          '\nвыдай неопознанные'
+                                          '\nочисти неопознанные'
+                                          '\nссылка на меня: http://t.me/svyat93_bot')
 
 
 @bot.message_handler(content_types=['text'])
@@ -59,33 +64,38 @@ def start_message(message):
 @db.set_user_info
 def send_text(message):
     time.sleep(0.5)
-    if cm.is_hello(message.text):
-        bot.send_message(message.chat.id, cm.say_hello())
-    elif cm.is_goodbye(message.text):
-        bot.send_message(message.chat.id, cm.say_goodbye())
-    elif cm.is_weather_question(message.text):
+    if cm.is_weather_question(message.text):
         bot.send_message(message.chat.id, 'Погоди, спрошу у Яндекса')
         bot.send_message(message.chat.id, WeatherManager().get_weather_info())
-    elif 'как дела' in message.text.lower() or 'как жизнь' in message.text.lower() or 'как твои дела' \
-            in message.text.lower():
-        bot.send_message(message.chat.id, 'Отлично! Как и у вас, надеюсь :)')
-    # служебные
-    elif 'выдай неопознанные' in message.text.lower():
+    elif ('выдай неопознанные' in message.text.lower()) and db.is_admin_id(message.from_user.id):
         bot.send_message(message.chat.id, db.get_unknown_massage_info())
-    elif 'очисти неопознанные' in message.text.lower():
+    elif ('очисти неопознанные' in message.text.lower()) and db.is_admin_id(message.from_user.id):
         bot.send_message(message.chat.id, db.delete_all_unknown_messages())
+    elif ('дай ссылку на себя' in message.text.lower() or 'дай свою ссылку' in message.text.lower()) \
+            and db.is_admin_id(db.is_admin_id(message.from_user.id)):
+        bot.send_message(message.chat.id, 'http://t.me/svyat93_bot')
     else:
-        db.set_unknown_message_info(message)
-        time.sleep(1)
-        bot.send_message(message.chat.id, 'Кажется, меня такому не учили :(')
-        time.sleep(0.5)
-        bot.send_message(message.chat.id, 'Пойду жаловаться создателю на свою глупость')
-        time.sleep(1.5)
-        bot.send_message(message.chat.id, info_message)
+        request = apiai.ApiAI('9b5ef6f406254c3e8e38908ae1196e29').text_request()  # Токен API к Dialogflow
+        request.lang = 'ru'  # На каком языке будет послан запрос
+        request.session_id = 'small-talk-bmnycd'  # ID Сессии диалога (нужно, чтобы потом учить бота)
+        request.query = message.text  # Посылаем запрос к ИИ с сообщением от юзера
+        response_json = json.loads(request.getresponse().read().decode('utf-8'))
+        response = response_json['result']['fulfillment']['speech']  # Разбираем JSON и вытаскиваем ответ
+        # Если есть ответ от бота - присылаем юзеру, если нет - бот его не понял
+        if response:
+            bot.send_message(chat_id=message.chat.id, text=response)
+        else:
+            db.set_unknown_message_info(message)
+            bot.send_message(chat_id=message.chat.id, text='Я Вас не совсем понял!')
+
 
 # Команда для запуска бота
-bot.polling()
 
-
-while True:  # Don't end the main thread.
-    pass
+if __name__ == "__main__":
+    while True:
+        try:
+            bot.polling(none_stop=True, interval=1, timeout=120)
+        except requests.exceptions.ConnectTimeout:
+            bot.stop_polling()
+            print('Словил таймаут исключение')
+            bot.polling(none_stop=True, interval=1, timeout=120)
