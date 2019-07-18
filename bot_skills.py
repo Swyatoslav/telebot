@@ -4,6 +4,9 @@ from datetime import date
 import bs4
 import requests
 
+import apiai
+import json
+
 
 class WeatherManager:
     """Класс, работающий с парсингом погоды"""
@@ -27,10 +30,10 @@ class WeatherManager:
         morning_temp = self._get_weather_info('Утро')
         day_temp = self._get_weather_info('День')
         evening_temp = self._get_weather_info('Вечер')
-        night_temp = self._get_weather_info('Ночь')
+        # night_temp = self._get_weather_info('Ночь')
 
-        return 'Погода в Новосибирске сегодня такая..\nУтро: {}°\nДень: {}°\nВечер: {}°\nНочь: {}°'.format(
-            morning_temp, day_temp, evening_temp, night_temp)
+        return 'Погода в Новосибирске сегодня такая..\nУтро: {}°\nДень: {}°\nВечер: {}°'.format(
+            morning_temp, day_temp, evening_temp)
 
     def _get_weather_info(self, day_part):
         """Вспомогательный метод, парсит погоду на утро"""
@@ -64,50 +67,18 @@ class WeatherManager:
 class CommunicationManager:
     """Класс для общения с людьми"""
 
-    def is_hello(self, message):
-        """Метод проверяет, поздоровались ли с ботом
-        :param message - принятое сообщение
+    def get_bot_answer(self, message):
+        """Метод отвечает на сообщение пользователя
+        :param message - сообщение пользователя
         """
 
-        hello_phrases = ['здорова', 'здарова', 'че как', 'че как', 'хай', 'хаюшки', 'привет', 'доброе утро', 'добрый день',
-                         'добрый вечер', 'hello', 'hi', 'здравствуй']
-        for phrase in hello_phrases:
-            if phrase in message.lower():
-                return True
+        request = apiai.ApiAI('9b5ef6f406254c3e8e38908ae1196e29').text_request()  # Токен API к Dialogflow
+        request.lang = 'ru'  # На каком языке будет послан запрос
+        request.session_id = 'small-talk-bmnycd'  # ID Сессии диалога (нужно, чтобы потом учить бота)
+        request.query = message.text  # Посылаем запрос к ИИ с сообщением от юзера
+        response_json = json.loads(request.getresponse().read().decode('utf-8'))
 
-        return False
-
-    def is_goodbye(self, message):
-        """Метод проверяет, попрощались ли с ботом
-        :param - сообщение боту
-        """
-
-        bye_phrases = ['пока', 'досвидания', 'до свидания', 'досвиданья', 'до свидания', 'Увидимся', 'до завтра',
-                       'бывай', 'до скорого', 'увидимся']
-
-        for phrase in bye_phrases:
-            if phrase in message.lower():
-                return True
-
-        return False
-
-    def say_hello(self):
-        """Метод здоровается с человеком"""
-        hello_phrases = ['Привет, человек!', 'Хееееей здорова :)', 'Я вас категорически приветствую',
-                          'Привет, ты кто? Шутка, я все про тебя знаю ;)', 'Guten tag! С немецкого - Добрый день :)']
-
-        answer_num = random.randint(0, len(hello_phrases) - 1)
-        return hello_phrases[answer_num]
-
-    def say_goodbye(self):
-        """Метод прощается с человеком"""
-
-        goodbye_phrases = ['Не пропадай!', 'Жду нашей следующей встречи :)', 'Пока! =)', 'Даже на десерт не остался..',
-                           'Очень жаль.. видимо у тебя есть дела поважнее']
-
-        answer_num = random.randint(0, len(goodbye_phrases) - 1)
-
-        return goodbye_phrases[answer_num]
+        return response_json['result']['fulfillment']['speech']  # Разбираем JSON и вытаскиваем ответ
 
     def is_weather_question(self, message):
         """Метод проверяет, не о погоде ли спросили бота

@@ -60,11 +60,13 @@ class DBManager:
         else:
             message_id = result[0] + 1
 
+        last_user_name = ' ' + message.from_user.last_name if message.from_user.last_name else ''
+
         self.cursor.execute('INSERT INTO admin.unknown_messages('
                             'id, uid, name, message, message_time)	VALUES ('
                             '%s, %s, %s, %s, %s);', (
                                 message_id, message.from_user.id,
-                                message.from_user.first_name + ' ' + message.from_user.last_name,
+                                last_user_name,
                                 message.text, cur_date))
 
         self.conn.commit()

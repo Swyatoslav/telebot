@@ -2,8 +2,6 @@ import os
 import sys
 import time
 
-import apiai
-import json
 import requests
 import telebot
 
@@ -29,7 +27,7 @@ lm = LogManager()
 db = DBManager(cm.get('general', 'db'), cm.get('general', 'db_user_name'), cm.get('general', 'db_user_password'))
 
 # Инициализируем бота
-bot = telebot.TeleBot(cm.get('general', 'token'))
+bot = telebot.TeleBot(cm.get('general', 'token'), threaded=False)
 hello_message = 'Привет!\nЯ бета версия умного бота'
 info_message = 'Вот что я пока умею:\n' \
                '\n' \
@@ -75,13 +73,8 @@ def send_text(message):
             and db.is_admin_id(db.is_admin_id(message.from_user.id)):
         bot.send_message(message.chat.id, 'http://t.me/svyat93_bot')
     else:
-        request = apiai.ApiAI('9b5ef6f406254c3e8e38908ae1196e29').text_request()  # Токен API к Dialogflow
-        request.lang = 'ru'  # На каком языке будет послан запрос
-        request.session_id = 'small-talk-bmnycd'  # ID Сессии диалога (нужно, чтобы потом учить бота)
-        request.query = message.text  # Посылаем запрос к ИИ с сообщением от юзера
-        response_json = json.loads(request.getresponse().read().decode('utf-8'))
-        response = response_json['result']['fulfillment']['speech']  # Разбираем JSON и вытаскиваем ответ
         # Если есть ответ от бота - присылаем юзеру, если нет - бот его не понял
+        response = cm.get_bot_answer(message)
         if response:
             bot.send_message(chat_id=message.chat.id, text=response)
         else:
@@ -98,4 +91,5 @@ if __name__ == "__main__":
         except requests.exceptions.ConnectTimeout:
             bot.stop_polling()
             print('Словил таймаут исключение')
+            time.sleep(1)
             bot.polling(none_stop=True, interval=1, timeout=120)
