@@ -27,41 +27,54 @@ class WeatherManager:
 
         """
 
-        morning_temp = self._get_weather_info('Утро')
-        day_temp = self._get_weather_info('День')
-        evening_temp = self._get_weather_info('Вечер')
-        # night_temp = self._get_weather_info('Ночь')
+        morning_temp = self._get_weather_temp('Утро')
+        day_temp = self._get_weather_temp('День')
+        evening_temp = self._get_weather_temp('Вечер')
+        night_temp = self._get_weather_temp('Ночь')
 
-        return 'Погода в Новосибирске сегодня такая..\nУтро: {}°\nДень: {}°\nВечер: {}°'.format(
-            morning_temp, day_temp, evening_temp)
+        morning_condition = self._get_weather_condition('Утро')
+        day_condition = self._get_weather_condition('День')
+        evening_condition = self._get_weather_condition('Вечер')
+        night_condition = self._get_weather_condition('Ночь')
 
-    def _get_weather_info(self, day_part):
-        """Вспомогательный метод, парсит погоду на утро"""
+        return 'Погода в Новосибирске сегодня такая\n' \
+               '\n{0}°\n({1})' \
+               '\n\n{2}°\n({3})' \
+               '\n\n{4}°\n({5})' \
+               '\n\n{6}°\n({7})'.format(
+                morning_temp, morning_condition,
+                day_temp, day_condition,
+                evening_temp, evening_condition,
+                night_temp, night_condition)
+
+    def _get_weather_condition(self, day_part):
+        """Вспомогательный метод, возвращает погодные условия"""
 
         # Температуры на утро, день, вечер и ночь в яндексе идут один за другим
         day_query = {'Утро': '1', 'День': '2', 'Вечер': '3', 'Ночь': '4'}
         tmp_value = day_query[day_part]
 
-        # Определяем диапазон утренней погоды на сегодня
-        range_elm = ' tbody>tr:nth-child({})>td:nth-child(1) .weather-table__temp'.format(tmp_value)
-        # Определяем начальное значение диапазона погоды
-        start_elm = '>.temp:nth-child(1)'
-        # Собираем локатор для определения начального значение диапазона погоды
-        start_join = "{}{}{}".format(self.today_elm, range_elm, start_elm)
-        # Определяем начальное значение диапазона погоды
-        start_str = self.bs.select(start_join)[0].get_text()
-        # Определяем конечное значение диапазона погоды
-        end_elm = '>.temp:nth-child(2)'
-        # Собираем локатор для определения конечного значение диапазона погоды
-        end_join = "{}{}{}".format(self.today_elm, range_elm, end_elm)
-        # Определяем конечное значение диапазона погоды
-        end_str = self.bs.select(end_join)[0].get_text()
+        day_part_elm = ' .weather-table__body>tr:nth-child({})'.format(tmp_value)
+        condition_elm = ' .weather-table__body-cell_type_condition'
+        condition_join = '{}{}{}'.format(self.today_elm, day_part_elm, condition_elm)
 
-        # Считаем среднее значение температуры за интервал
-        start_value = start_str[1:len(start_str) - 1]
-        end_value = end_str[1: len(end_str) - 1]
+        condition_str = self.bs.select(condition_join)[0].get_text()
 
-        return (int(start_value) + int(end_value)) // 2
+        return condition_str
+
+    def _get_weather_temp(self, day_part):
+        """Вспомогательный метод, парсит погоду"""
+
+        # Температуры на утро, день, вечер и ночь в яндексе идут один за другим
+        day_query = {'Утро': '1', 'День': '2', 'Вечер': '3', 'Ночь': '4'}
+        tmp_value = day_query[day_part]
+
+        day_part_elm = ' .weather-table__body>tr:nth-child({})'.format(tmp_value)
+        temp_elm = ' .weather-table__body-cell_type_feels-like .temp .temp__value'
+        temp_join = "{}{}{}".format(self.today_elm, day_part_elm, temp_elm)
+        temp_str = self.bs.select(temp_join)[0].get_text()
+
+        return '{}: {}'.format(day_part, temp_str)
 
 
 class CommunicationManager:
