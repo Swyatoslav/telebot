@@ -32,7 +32,7 @@ class WeatherManager:
         evening_weather = self._parse_weather_info('Вечер')
         night_weather = self._parse_weather_info('Ночь')
 
-        return 'Погода в Новосибирске сегодня такая' \
+        return 'Погода в Новосибирске сегодня такая\n' \
                '{0}{1}{2}{3}'.format(morning_weather, day_weather, evening_weather, night_weather)
 
     def _parse_weather_info(self, day_part):
@@ -52,8 +52,32 @@ class WeatherManager:
         condition_elm = ' .weather-table__body-cell_type_condition'
         condition_join = '{}{}{}'.format(self.today_elm, day_part_elm, condition_elm)
         condition_str = self.bs.select(condition_join)[0].get_text()
+        condition_emodji = self._get_emoji(condition_str)
 
-        return '\n{}: {}\n({})\n'.format(day_part, temp_str, condition_str)
+        return '\n{}: {} {}'.format(day_part, temp_str, condition_emodji)
+
+    def _get_emoji(self, condition):
+        """Возвращает смайлик, соответствующий погодным условиям
+        :param condition - погодные условия
+        """
+
+        thunderstorm = u'\U0001F4A8'
+        rain = u'\U00002614'
+        clearSky = u'\U00002600'
+        fewClouds = u'\U000026C5'
+        clouds = u'\U00002601'
+        hot = u'\U0001F525'
+
+        weather_query = {'Облачно с прояснениями': fewClouds,
+                         'Малооблачно': fewClouds,
+                         'Небольшой дождь': rain,
+                         'Дождь': rain,
+                         'Ясно': clearSky,
+                         'Пасмурно': clouds,
+                         'Ливень': thunderstorm,
+                         }
+
+        return weather_query[condition]
 
 
 class CommunicationManager:
