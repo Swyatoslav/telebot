@@ -46,7 +46,7 @@ def start_message(message):
         bot.send_message(message.chat.id, info_message)
     elif '/weather' in message.text:
         bot.send_message(message.chat.id, 'Секундочку')
-        bot.send_message(message.chat.id, WeatherManager().get_weather_info())
+        bot.send_message(message.chat.id, WeatherManager().get_weather_info(message))
     elif message.text in ['/help']:
         bot.send_message(message.chat.id, info_message)
     elif 'qwsa1234' in message.text and message.from_user.id:
@@ -64,7 +64,7 @@ def send_text(message):
     time.sleep(0.5)
     if cm.is_weather_question(message.text):
         bot.send_message(message.chat.id, 'Секундочку')
-        bot.send_message(message.chat.id, WeatherManager().get_weather_info())
+        bot.send_message(message.chat.id, WeatherManager().get_weather_info(message))
     elif ('выдай неопознанные' in message.text.lower()) and db.is_admin_id(message.from_user.id):
         bot.send_message(message.chat.id, db.get_unknown_massage_info())
     elif ('очисти неопознанные' in message.text.lower()) and db.is_admin_id(message.from_user.id):
