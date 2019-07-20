@@ -100,3 +100,34 @@ class DBManager:
         self.conn.commit()
 
         return self.cursor.fetchone()[0] == user_id
+
+    def set_regions_info(self, region_hrefs, region_names):
+        """Метод записывает в базу информацию о регионах яндекс.погоды
+        :param region_hrefs - списов ссылок на регионы в яндекс.погоде
+        :param region_names - список названий регионов
+        """
+
+        for i in range(len(region_names)):
+            self.cursor.execute("SELECT id from admin.regions order by id desc limit 1")
+            result = self.cursor.fetchone()
+
+            # Проверяем id. Если база пустая, задаем id = 1 Для избежания ошибки при записи
+            region_id = 1 if result is None else int(result[0]) + 1
+            self.cursor.execute('INSERT INTO admin.regions( '
+                                'id, region_name, region_href) VALUES ('
+                                '%s, %s, %s);', (region_id, region_names[i], region_hrefs[i]))
+            self.conn.commit()
+
+    def set_places_info(self, places_info):
+        for i in range(len(places_info)):
+            region_name = next(iter(places_info[i]))
+
+            for j in range(len(places_info[i][region_name][0])):
+                self.cursor.execute("SELECT id from admin.places order by id desc limit 1")
+                result = self.cursor.fetchone()
+                place_id = 1 if result is None else int(result[0]) + 1
+                self.cursor.execute('INSERT INTO admin.places('
+                                    'id, region_name, place_name, place_href) VALUES ('
+                                    '%s, %s, %s, %s);', (place_id, region_name, places_info[i][region_name][1][j],
+                                                         places_info[i][region_name][0][j]))
+                self.conn.commit()

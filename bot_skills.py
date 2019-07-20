@@ -4,6 +4,7 @@ from datetime import date
 import apiai
 import bs4
 import requests
+from telebot import types
 
 
 class WeatherManager:
@@ -28,6 +29,16 @@ class WeatherManager:
         weather.insert(0, day_txt)  # Первым аргументом ставим день, когда смотрим погоду
 
         return 'Погода в Новосибирске {0} такая\n{1}{2}{3}{4}'.format(*weather)
+
+    def show_weather_buttons(self):
+        """Метод создает строку кнопок выбора погоды"""
+
+        markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True, resize_keyboard=True)
+        today_btn = types.KeyboardButton('Погода сегодня')
+        tomorrow_btn = types.KeyboardButton('Погода завтра')
+        markup.add(today_btn, tomorrow_btn)
+
+        return markup
 
     def _parse_weather_info(self, day_part, day_txt):
         """Вспомогательный метод, парсит погоду
@@ -105,6 +116,23 @@ class CommunicationManager:
 
         for phrase in weather_phrases:
             if phrase in message.lower():
+                return True
+
+        return False
+
+    def is_skill_question(self, message):
+        """Метод проверяет, не про возможности ли бота был задан вопрос
+        :param message - сообщение юзера
+        """
+
+        skills_questions = ['что ты умеешь', 'что умеешь', 'что ещё умеешь', 'что еще умеешь', 'ты умеешь',
+                            'твои функции', 'твои возможности', 'ты сможешь', 'ты можешь', 'ты ещё сможешь',
+                            'ты еще сможешь', 'ты ещё можешь', 'ты еще можешь', 'ты мог бы', 'мог бы ты',
+                            'твоя функция', 'твои навыки', 'чему ты обучен', 'ты обучен', 'что можешь',
+                            'что могешь']
+
+        for skill_question in skills_questions:
+            if skill_question in message.text.lower():
                 return True
 
         return False
