@@ -27,41 +27,33 @@ class WeatherManager:
 
         """
 
-        morning_temp = self._get_weather_info('Утро')
-        day_temp = self._get_weather_info('День')
-        evening_temp = self._get_weather_info('Вечер')
-        # night_temp = self._get_weather_info('Ночь')
+        morning_weather = self._parse_weather_info('Утро')
+        day_weather = self._parse_weather_info('День')
+        evening_weather = self._parse_weather_info('Вечер')
+        night_weather = self._parse_weather_info('Ночь')
 
-        return 'Погода в Новосибирске сегодня такая..\nУтро: {}°\nДень: {}°\nВечер: {}°'.format(
-            morning_temp, day_temp, evening_temp)
+        return 'Погода в Новосибирске сегодня такая' \
+               '{0}{1}{2}{3}'.format(morning_weather, day_weather, evening_weather, night_weather)
 
-    def _get_weather_info(self, day_part):
-        """Вспомогательный метод, парсит погоду на утро"""
+    def _parse_weather_info(self, day_part):
+        """Вспомогательный метод, парсит погоду"""
 
         # Температуры на утро, день, вечер и ночь в яндексе идут один за другим
         day_query = {'Утро': '1', 'День': '2', 'Вечер': '3', 'Ночь': '4'}
         tmp_value = day_query[day_part]
+        day_part_elm = ' .weather-table__body>tr:nth-child({})'.format(tmp_value)  # Локатор строки времени дня
 
-        # Определяем диапазон утренней погоды на сегодня
-        range_elm = ' tbody>tr:nth-child({})>td:nth-child(1) .weather-table__temp'.format(tmp_value)
-        # Определяем начальное значение диапазона погоды
-        start_elm = '>.temp:nth-child(1)'
-        # Собираем локатор для определения начального значение диапазона погоды
-        start_join = "{}{}{}".format(self.today_elm, range_elm, start_elm)
-        # Определяем начальное значение диапазона погоды
-        start_str = self.bs.select(start_join)[0].get_text()
-        # Определяем конечное значение диапазона погоды
-        end_elm = '>.temp:nth-child(2)'
-        # Собираем локатор для определения конечного значение диапазона погоды
-        end_join = "{}{}{}".format(self.today_elm, range_elm, end_elm)
-        # Определяем конечное значение диапазона погоды
-        end_str = self.bs.select(end_join)[0].get_text()
+        # Ищем температуру
+        temp_elm = ' .weather-table__body-cell_type_feels-like .temp .temp__value'
+        temp_join = "{}{}{}".format(self.today_elm, day_part_elm, temp_elm)
+        temp_str = self.bs.select(temp_join)[0].get_text()
 
-        # Считаем среднее значение температуры за интервал
-        start_value = start_str[1:len(start_str) - 1]
-        end_value = end_str[1: len(end_str) - 1]
+        # Ищем погодные условия
+        condition_elm = ' .weather-table__body-cell_type_condition'
+        condition_join = '{}{}{}'.format(self.today_elm, day_part_elm, condition_elm)
+        condition_str = self.bs.select(condition_join)[0].get_text()
 
-        return (int(start_value) + int(end_value)) // 2
+        return '\n{}: {}\n({})\n'.format(day_part, temp_str, condition_str)
 
 
 class CommunicationManager:
