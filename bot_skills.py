@@ -1,42 +1,52 @@
-import random
+import json
 from datetime import date
 
+import apiai
 import bs4
 import requests
-
-import apiai
-import json
+from telebot import types
 
 
 class WeatherManager:
     """Класс, работающий с парсингом погоды"""
 
-    today = date.today()
     cur_day = date.today().day
     weather_site = 'https://yandex.ru/pogoda/novosibirsk/details#{}'.format(cur_day)
     response = requests.get(weather_site)
     bs = bs4.BeautifulSoup(response.text, "html.parser")
 
     today_elm = ".forecast-details>dd:nth-child(2)"
+    tomorrow_elm = '.forecast-details>dd:nth-child(5)'
 
-    def get_weather_info(self):
+    def get_weather_info(self, message):
         """Метод позволяет спарсить погоду сайта Яндекс
-        Подсказки:
-        # following-sibling - следующий элемент в DOM на том же уровне
-        # ancestor:: - поиск предка
-
+        :param message - сообщение пользователя
         """
 
-        morning_weather = self._parse_weather_info('Утро')
-        day_weather = self._parse_weather_info('День')
-        evening_weather = self._parse_weather_info('Вечер')
-        night_weather = self._parse_weather_info('Ночь')
+        day_parts = ['Утро', 'День', 'Вечер', 'Ночь']
+        day_txt = 'завтра' if 'завтра' in message.text.lower() else 'сегодня'
+        weather = [self._parse_weather_info(day_part, day_txt) for day_part in day_parts]
+        weather.insert(0, day_txt)  # Первым аргументом ставим день, когда смотрим погоду
 
-        return 'Погода в Новосибирске сегодня такая\n' \
-               '{0}{1}{2}{3}'.format(morning_weather, day_weather, evening_weather, night_weather)
+        return 'Погода в Новосибирске {0} такая\n{1}{2}{3}{4}'.format(*weather)
 
-    def _parse_weather_info(self, day_part):
-        """Вспомогательный метод, парсит погоду"""
+    def show_weather_buttons(self):
+        """Метод создает строку кнопок выбора погоды"""
+
+        markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True, resize_keyboard=True)
+        today_btn = types.KeyboardButton('Погода сегодня')
+        tomorrow_btn = types.KeyboardButton('Погода завтра')
+        markup.add(today_btn, tomorrow_btn)
+
+        return markup
+
+    def _parse_weather_info(self, day_part, day_txt):
+        """Вспомогательный метод, парсит погоду
+        :param day_part - Время дня (Утро/День/Вечер/Ночь)
+        :param day_txt - на какой день выводить погоду (сегодня/завтра)
+        """
+
+        day_elm = self.today_elm if day_txt == 'сегодня' else self.tomorrow_elm
 
         # Температуры на утро, день, вечер и ночь в яндексе идут один за другим
         day_query = {'Утро': '1', 'День': '2', 'Вечер': '3', 'Ночь': '4'}
@@ -45,26 +55,27 @@ class WeatherManager:
 
         # Ищем температуру
         temp_elm = ' .weather-table__body-cell_type_feels-like .temp .temp__value'
-        temp_join = "{}{}{}".format(self.today_elm, day_part_elm, temp_elm)
+        temp_join = "{}{}{}".format(day_elm, day_part_elm, temp_elm)
         temp_str = self.bs.select(temp_join)[0].get_text()
 
         # Ищем погодные условия
         condition_elm = ' .weather-table__body-cell_type_condition'
-        condition_join = '{}{}{}'.format(self.today_elm, day_part_elm, condition_elm)
+        condition_join = '{}{}{}'.format(day_elm, day_part_elm, condition_elm)
         condition_str = self.bs.select(condition_join)[0].get_text()
-        condition_emodji = self._get_emoji(condition_str)
+        condition_emodji = self._get_emoji(condition_str, day_part)
 
         return '\n{}: {} {}'.format(day_part, temp_str, condition_emodji)
 
-    def _get_emoji(self, condition):
+    def _get_emoji(self, condition, day_part):
         """Возвращает смайлик, соответствующий погодным условиям
         :param condition - погодные условия
+        :param day_part - Время дня
         """
 
         thunderstorm = u'\U0001F4A8'
         rain = u'\U00002614'
-        clearSky = u'\U00002600'
-        fewClouds = u'\U000026C5'
+        clearSky = u'\U00002600' if day_part != 'Ночь' else u'\U0001F303'
+        fewClouds = u'\U000026C5' if day_part != 'Ночь' else u'\U0001F303'
         clouds = u'\U00002601'
         hot = u'\U0001F525'
 
@@ -101,7 +112,7 @@ class CommunicationManager:
         :param message сообщение боту
         """
 
-        weather_phrases = ['погода',' погоде', 'погоду', 'погодой', 'погода']
+        weather_phrases = ['погода', ' погоде', 'погоду', 'погодой', 'погода']
 
         for phrase in weather_phrases:
             if phrase in message.lower():
@@ -109,4 +120,19 @@ class CommunicationManager:
 
         return False
 
+    def is_skill_question(self, message):
+        """Метод проверяет, не про возможности ли бота был задан вопрос
+        :param message - сообщение юзера
+        """
 
+        skills_questions = ['что ты умеешь', 'что умеешь', 'что ещё умеешь', 'что еще умеешь', 'ты умеешь',
+                            'твои функции', 'твои возможности', 'ты сможешь', 'ты можешь', 'ты ещё сможешь',
+                            'ты еще сможешь', 'ты ещё можешь', 'ты еще можешь', 'ты мог бы', 'мог бы ты',
+                            'твоя функция', 'твои навыки', 'чему ты обучен', 'ты обучен', 'что можешь',
+                            'что могешь']
+
+        for skill_question in skills_questions:
+            if skill_question in message.text.lower():
+                return True
+
+        return False
