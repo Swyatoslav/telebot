@@ -4,12 +4,11 @@ import time
 
 import requests
 import telebot
-from telebot import types
 
 from bot_config import ConfigManager
 from bot_db import DBManager
 from bot_logging import LogManager
-from bot_skills import WeatherManager, CommunicationManager
+from bot_skills import MasterOfWeather, CommunicationManager
 
 # Создадим конфиг
 config_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'config.ini')
@@ -29,25 +28,24 @@ info_message = 'Вот что я умею:\n' \
                'Полный список команд вы увидите,\n' \
                'введя в поле сообщения \n(не отправляя) символ /\n\n' \
                'Ссылка на меня: \nhttp://t.me/svyat93_bot\n\n' \
-               'Повтор подсказок: /help\n' \
-
-
+               'Повтор подсказок: /help\n'
 lm = LogManager()  # логирование
 db = DBManager(config.get('general', 'db'), config.get('general', 'db_user_name'),
                config.get('general', 'db_user_password'))  # Соединение с бд
 cm = CommunicationManager()  # Общение с пользователем
-wm = WeatherManager()  # Работа с погодой
+mow = MasterOfWeather()  # Работа с погодой
 
 
 @db.set_user_info
-@bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234'])
+@bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather'])
 @lm.log_message
 def start_message(message):
     if message.text in '/start':
         bot.send_message(message.chat.id, hello_message)
         bot.send_message(message.chat.id, info_message)
     elif '/weather' in message.text:
-        bot.send_message(message.chat.id, 'Нажмите нужную кнопку внизу', reply_markup=wm.show_weather_buttons(),)
+        bot.send_message(message.chat.id, 'Нажмите нужную кнопку внизу',
+                         reply_markup=mow.set_buttons('Погода сегодня', 'Погода завтра'))
     elif message.text in ['/help']:
         bot.send_message(message.chat.id, info_message)
     elif 'qwsa1234' in message.text and message.from_user.id:
@@ -56,6 +54,13 @@ def start_message(message):
                                           '\nвыдай неопознанные'
                                           '\nочисти неопознанные'
                                           '\nссылка на меня: http://t.me/svyat93_bot')
+    elif 'new_weather' in message.text:
+        result = db.get_place_info_of_user_by_user_id(message.from_user.id)
+        bot.send_message(message.chat.id, 'Сейчас вы смотрите погоду в месте\n'
+                                          'под названием {}\n'
+                                          'Если желаете изменить его, нажмите\n'
+                                          'соответствующую кнопку'.format(result[1]),
+                                           reply_markup=mow.set_buttons('Желаю изменить', 'Оставлю как есть'))
 
 
 @bot.message_handler(content_types=['text'])
@@ -63,16 +68,26 @@ def start_message(message):
 @db.set_user_info
 def send_text(message):
     time.sleep(0.5)
-    if cm.is_weather_question(message.text):
+
+    # Настройка вывода погоды
+    if db.get_weather_edit_mode_stage(message.from_user.id):
+        mow.weather_place_mode(message, db, bot)
+    # Вывод погоды
+    elif cm.is_weather_question(message.text):
         bot.send_message(message.chat.id, 'Секундочку')
-        bot.send_message(message.chat.id, wm.get_weather_info(message))
+        if not db.is_weather_place_set(message.from_user.id):  # Если неизвестно, где искать погоду, идем настраивать
+            mow.weather_place_mode(message, db, bot)
+        else:
+            bot.send_message(message.chat.id, mow.get_weather_info(db, message))
+    elif 'оставлю как есть' in message.text.lower():
+        bot.send_message(message.chat.id, 'Хорошо, вы знаете где меня найти :)')
+    elif 'желаю изменить' in message.text.lower():
+        db.set_place_id_to_user(None, message.from_user.id)
+        mow.weather_place_mode(message, db, bot)
     elif ('выдай неопознанные' in message.text.lower()) and db.is_admin_id(message.from_user.id):
         bot.send_message(message.chat.id, db.get_unknown_massage_info())
     elif ('очисти неопознанные' in message.text.lower()) and db.is_admin_id(message.from_user.id):
         bot.send_message(message.chat.id, db.delete_all_unknown_messages())
-    elif ('дай ссылку на себя' in message.text.lower() or 'дай свою ссылку' in message.text.lower()) \
-            and db.is_admin_id(db.is_admin_id(message.from_user.id)):
-        bot.send_message(message.chat.id, 'http://t.me/svyat93_bot')
     elif cm.is_skill_question(message):
         bot.send_message(message.chat.id, info_message)
     else:
@@ -83,6 +98,7 @@ def send_text(message):
         else:
             db.set_unknown_message_info(message)
             bot.send_message(message.chat.id, text='Я Вас не совсем понял!')
+            time.sleep(0.5)
             bot.send_message(message.chat.id, info_message)
 
 

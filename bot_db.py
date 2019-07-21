@@ -93,6 +93,8 @@ class DBManager:
         self.cursor.execute('TRUNCATE admin.unknown_messages')
         self.conn.commit()
 
+        return 'Неопознанные сообщения стерты'
+
     def is_admin_id(self, user_id):
         """Метод проверяет, id админа передано или нет"""
 
@@ -131,3 +133,117 @@ class DBManager:
                                     '%s, %s, %s, %s);', (place_id, region_name, places_info[i][region_name][1][j],
                                                          places_info[i][region_name][0][j]))
                 self.conn.commit()
+
+    def get_weather_edit_mode_stage(self, user_id):
+        """Проверяем, не идет ли настройка погоды у пользователя"""
+
+        self.cursor.execute('SELECT edit_weather_mode FROM admin.users where id=%s', [user_id])
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result[0]
+
+    def is_weather_place_set(self, user_id):
+        """Метод проверяет, выставлен ли город для определения погоды
+        :param user_id - id пользователя
+        """
+
+        self.cursor.execute('SELECT weather_place_id FROM admin.users where id=%s', [user_id])
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result[0]
+
+    def set_weather_edit_mode(self, user_id, stage):
+        """Выставляем флаг начала настройки погоды
+        :param user_id - id пользователя
+        :param stage - этап настройки
+        """
+
+        self.cursor.execute("UPDATE admin.users	SET edit_weather_mode=%s WHERE id=%s;", (stage, user_id))
+        self.conn.commit()
+
+        return 'Выставлен режим настройки: {}'.format(stage)
+
+    def get_place_info_by_name(self, text):
+        """Метод выдергивает информацию о населенном пункте по его названию
+        :param - текст, по которому ищем населенный пункт
+        """
+
+        self.cursor.execute('SELECT id, region_name, place_name, place_href	'
+                            'FROM admin.places '
+                            'WHERE place_name ILIKE %s', [text])
+        self.conn.commit()
+
+        result = self.cursor.fetchall()
+
+        return result
+
+    def set_place_id_to_user(self, place_id, user_id):
+        """Метод записывает id населенного пункта в информацию юзера
+        :param place_id - id населенного пункта
+        :param user_id - id пользователя
+        """
+
+        self.cursor.execute('UPDATE admin.users	SET weather_place_id=%s	WHERE id=%s;', (place_id, user_id))
+        self.conn.commit()
+
+    def get_place_info_of_user_by_user_id(self, user_id):
+        """Метод возвращает id места по id юзера
+        :param user_id - id юзера
+        """
+
+        self.cursor.execute('SELECT weather_place_id FROM admin.users WHERE id=%s', [user_id])
+        place_id = self.cursor.fetchone()[0]
+        self.cursor.execute('SELECT place_href, place_name FROM admin.places WHERE id=%s;', [place_id])
+        place_info = self.cursor.fetchone()
+        self.conn.commit()
+
+        return place_info
+
+    def create_tmp_table_for_search_place(self, user_id):
+        """Метод создает временную таблицу для хранения промежуточных значений результатов поиска
+        :param user_id - id юзера
+        """
+
+        table_name = 'admin.user_{}_tmp'.format(user_id)
+
+        self.cursor.execute('DROP TABLE IF EXISTS {};\n'
+                            'CREATE TABLE {}\n'
+                            '(\n'
+                            'id integer NOT NULL,\n'
+                            'region_name text COLLATE pg_catalog."default" NOT NULL,\n'
+                            'place_name text COLLATE pg_catalog."default" NOT NULL,\n'
+                            'place_href text COLLATE pg_catalog."default" NOT NULL)\n'
+                            'WITH (\n'
+                            'OIDS = FALSE\n'
+                            ')\n'
+                            'TABLESPACE pg_default;\n'
+
+                            'ALTER TABLE admin.places\n'
+                            'OWNER to postgres;'.format(table_name, table_name))
+        self.conn.commit()
+
+        return table_name
+
+    def set_tmp_result_of_search_weather_place(self, table_name, result):
+        """Метод записывает удачный результат поиска во временную таблицу
+        :param table_name - название временной таблицы
+        :param result - результат, который хотим сохранить
+        """
+
+        for result_line in result:
+            self.cursor.execute('INSERT INTO {}('
+                                'id, region_name, place_name, place_href) VALUES ('
+                                '%s, %s, %s, %s);'.format(table_name), (result_line[0],
+                                                                        result_line[1], result_line[2], result_line[3]))
+            self.conn.commit()
+
+    def get_info_from_tmp_weather_places(self, tmp_table):
+        """Метод вытаскивает информацию о поиске из временной таблицы"""
+
+        self.cursor.execute('SELECT id, region_name, place_name, place_href FROM {};'.format(tmp_table))
+        result = self.cursor.fetchall()
+        self.conn.commit()
+
+        return result
