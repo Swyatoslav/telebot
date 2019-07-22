@@ -54,13 +54,16 @@ def start_message(message):
                                           '\nвыдай неопознанные'
                                           '\nочисти неопознанные'
                                           '\nссылка на меня: http://t.me/svyat93_bot')
-    elif 'new_weather' in message.text:
+    elif 'new_weather' in message.text and db.is_weather_place_set(message.from_user.id):
         result = db.get_place_info_of_user_by_user_id(message.from_user.id)
         bot.send_message(message.chat.id, 'Сейчас вы смотрите погоду в месте\n'
                                           'под названием {}\n'
                                           'Если желаете изменить его, нажмите\n'
                                           'соответствующую кнопку'.format(result[1]),
                                            reply_markup=mow.set_buttons('Желаю изменить', 'Оставлю как есть'))
+    elif 'new_weather' in message.text and not db.is_weather_place_set(message.from_user.id):
+        bot.send_message(message.chat.id,   'Чтобы поменять место, его нужно сначало установить :)\n'
+                                            'Сделайте это с помощью команды /weather')
 
 
 @bot.message_handler(content_types=['text'])

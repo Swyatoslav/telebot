@@ -20,6 +20,7 @@ class MasterOfWeather:
 
     first_phase = 'Начало настройки'
     second_phase = 'Поиск города'
+    third_phase = 'Выбор города'
 
     def _hello_from_mow(self, message, db, bot):
         """Метод здоровается с пользователем и включает 1 фазу редактирования погоды"""
@@ -75,7 +76,12 @@ class MasterOfWeather:
                                               'Попробуйте ещё раз.',
                                                reply_markup=self.set_buttons(self.button1))
         elif len(result) > 1:
-            bot.send_message(message.chat.id, 'Найдено более одного совпадения')
+            tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)
+            db.set_tmp_result_of_search_weather_place(tmp_table, result)
+            db.set_weather_edit_mode(message.from_user.id, '')
+            bot.send_message(message.chat.id, 'Найдено более одного совпадения\n'
+                                              'Пожалуйста, посмотрите результаты\n'
+                                              'и введите номер строки с верным результатом.')
 
         else:
             bot.send_message(message.chat.id, '{} ({}), верно?'.format(result[0][2], result[0][1]),
@@ -83,6 +89,17 @@ class MasterOfWeather:
             # Запись результатов поиска во временную бд
             tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)
             db.set_tmp_result_of_search_weather_place(tmp_table, result)
+
+    def _third_phase_to_set_place(self, message, db, bot):
+        """Метод предлагает пользователю выбор из нескольких городов, найденных по запросу
+        :param message - сообщение пользователя
+        :param db - экземпляр БД
+        :param bot - экземпляр бота
+        """
+
+
+
+
 
     def weather_place_mode(self, message, db, bot):
         """Режим настройки места для вывода погоды пользователю
@@ -103,6 +120,8 @@ class MasterOfWeather:
             self._first_phase_to_set_place(message, db, bot)
         elif phase == self.second_phase:
             self._second_phase_to_set_place(message, db, bot)
+        elif phase == self.third_phase:
+            self._third_phase_to_set_place(message, db, bot)
 
     def get_weather_info(self, db, message):
         """Метод позволяет спарсить погоду сайта Яндекс
