@@ -40,15 +40,15 @@ mow = MasterOfWeather()  # Работа с погодой
 @bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather'])
 @lm.log_message
 def start_message(message):
-    if message.text in '/start':
+    if '/start' in message.text.lower():
         bot.send_message(message.chat.id, hello_message)
         bot.send_message(message.chat.id, info_message)
     elif '/weather' in message.text:
-        bot.send_message(message.chat.id, 'Нажмите нужную кнопку внизу',
+        bot.send_message(message.chat.id, 'Выберите одну из кнопок внизу',
                          reply_markup=mow.set_buttons('Погода сегодня', 'Погода завтра'))
-    elif message.text in ['/help']:
+    elif '/help'in message.text.lower():
         bot.send_message(message.chat.id, info_message)
-    elif 'qwsa1234' in message.text and message.from_user.id:
+    elif message.text == '!' and message.from_user.id:
         bot.send_message(message.chat.id, 'Привет, Святослав')
         bot.send_message(message.chat.id, 'Твои инструменты:'
                                           '\nвыдай неопознанные'
@@ -56,10 +56,10 @@ def start_message(message):
                                           '\nссылка на меня: http://t.me/svyat93_bot')
     elif 'new_weather' in message.text and db.is_weather_place_set(message.from_user.id):
         result = db.get_place_info_of_user_by_user_id(message.from_user.id)
-        bot.send_message(message.chat.id, 'Сейчас вы смотрите погоду в месте\n'
-                                          'под названием {}\n'
+        bot.send_message(message.chat.id, 'Сейчас вы смотрите погоду здесь: \n'
+                                          '{} ({})\n'
                                           'Если желаете изменить его, нажмите\n'
-                                          'соответствующую кнопку'.format(result[1]),
+                                          'соответствующую кнопку'.format(result[1], result[2]),
                                            reply_markup=mow.set_buttons('Желаю изменить', 'Оставлю как есть'))
     elif 'new_weather' in message.text and not db.is_weather_place_set(message.from_user.id):
         bot.send_message(message.chat.id,   'Чтобы поменять место, его нужно сначало установить :)\n'

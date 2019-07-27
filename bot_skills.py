@@ -6,6 +6,8 @@ import bs4
 import requests
 from telebot import types
 
+from bot_db import check_time
+
 
 class MasterOfWeather:
     """Класс, работающий с парсингом погоды (Мастер над погодой)"""
@@ -22,6 +24,7 @@ class MasterOfWeather:
     second_phase = 'Поиск города'
     third_phase = 'Выбор города'
 
+    @check_time
     def _hello_from_mow(self, message, db, bot):
         """Метод здоровается с пользователем и включает 1 фазу редактирования погоды"""
 
@@ -35,6 +38,7 @@ class MasterOfWeather:
         bot.send_message(message.chat.id, 'Выберите, пожалуйста, нужную кнопку :)',
                          reply_markup=self.set_buttons(self.button1, self.button2))
 
+    @check_time
     def _first_phase_to_set_place(self, message, db, bot):
         """Метод переводит пользователя с 1 фазы настройки на 2 фазу
         (согласие начать искать город или отказ от настроек)
@@ -49,11 +53,12 @@ class MasterOfWeather:
             bot.send_message(message.chat.id, 'Введите, пожалуйста, название своего\n'
                                               'населенного пункта (без слов "Город", "Хутор" и тп.)\n\n'
                                               'Прошу вас вводить название без ошибок :)',
-                                              reply_markup=self.set_buttons(self.button1))
+                             reply_markup=self.set_buttons(self.button1))
         else:
             bot.send_message(message.chat.id, 'Вы находитесь в режиме настройки погоды. Прервать настройку?',
                              reply_markup=self.set_buttons(self.button1, self.button2))
 
+    @check_time
     def _second_phase_to_set_place(self, message, db, bot):
         """Метод ищет для пользователя город, в котором тот хочет видеть погоду
         :param message - сообщение пользователя
@@ -61,35 +66,44 @@ class MasterOfWeather:
         :param bot - экземпляр бота
         """
 
+        tmp_table = 'admin.user_{}_tmp'.format(message.from_user.id)
+
         if 'верно' in message.text.lower() and not 'не' in message.text.lower():
-            tmp_result = db.get_info_from_tmp_weather_places('admin.user_{}_tmp'.format(message.from_user.id))
-            db.set_place_id_to_user(tmp_result[0][0], message.from_user.id)
+            tmp_result = db.get_all_info_from_tmp_weather_places(tmp_table)
+            db.set_place_id_to_user(tmp_result[0][1], message.from_user.id)
             db.set_weather_edit_mode(message.from_user.id, None)
-            bot.send_message(message.chat.id, 'Настройка успешно завершена :)\n'
-                                              'Теперь можете спрашивать меня о погоде \n'
-                                              'на сегодня и на завтра\n')
+            bot.send_message(message.chat.id,
+                             'Настройка успешно завершена :)\nСохранено: {}, {}\nСпрашивайте погоду\n'.format(
+                                 tmp_result[0][3], tmp_result[0][2]),
+                             reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
             return
 
         result = db.get_place_info_by_name(message.text)
         if not result:
             bot.send_message(message.chat.id, 'Возможно, название населенного пункта введено неверно.\n'
                                               'Попробуйте ещё раз.',
-                                               reply_markup=self.set_buttons(self.button1))
+                             reply_markup=self.set_buttons(self.button1))
         elif len(result) > 1:
             tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)
             db.set_tmp_result_of_search_weather_place(tmp_table, result)
-            db.set_weather_edit_mode(message.from_user.id, '')
+            db.set_weather_edit_mode(message.from_user.id, self.third_phase)
             bot.send_message(message.chat.id, 'Найдено более одного совпадения\n'
                                               'Пожалуйста, посмотрите результаты\n'
-                                              'и введите номер строки с верным результатом.')
-
+                                              'и введите номер строки с верным результатом.',
+                             reply_markup=self.set_buttons('Моего здесь нет'))
+            result_list = db.get_all_info_from_tmp_weather_places(tmp_table)
+            result_msg = ''
+            for res_line in result_list:
+                result_msg += '{}. {}, {}\n'.format(res_line[0], res_line[3], res_line[2])
+            bot.send_message(message.chat.id, result_msg)
         else:
             bot.send_message(message.chat.id, '{} ({}), верно?'.format(result[0][2], result[0][1]),
-                                              reply_markup=self.set_buttons('Верно', 'Неверно'))
+                             reply_markup=self.set_buttons('Верно', 'Неверно'))
             # Запись результатов поиска во временную бд
             tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)
             db.set_tmp_result_of_search_weather_place(tmp_table, result)
 
+    @check_time
     def _third_phase_to_set_place(self, message, db, bot):
         """Метод предлагает пользователю выбор из нескольких городов, найденных по запросу
         :param message - сообщение пользователя
@@ -97,10 +111,36 @@ class MasterOfWeather:
         :param bot - экземпляр бота
         """
 
+        tmp_table = 'admin.user_{}_tmp'.format(message.from_user.id)
+
+        if message.text.isdigit():
+            if int(message.text) in range(1, int(db.get_max_id_from_tmp_weather_places(tmp_table)[0] + 1)):
+                tmp_result = db.get_some_info_from_tmp_weather_places(tmp_table, int(message.text))
+                db.set_place_id_to_user(tmp_result[1], message.from_user.id)
+                db.set_weather_edit_mode(message.from_user.id, None)
+                bot.send_message(message.chat.id,
+                                 'Настройка успешно завершена :)\n'
+                                 'Сохранено: {}, {}\n'
+                                 'Выберите нужную кнопку\n'.format(
+                                     tmp_result[3], tmp_result[2]),
+                                 reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
 
 
+            else:
+                bot.send_message(message.chat.id, 'Указанной вами строки нет в предложенном списке..\n'
+                                                  'Введите номер ещё раз')
 
+        elif 'моего здесь нет' in message.text.lower():
+            db.set_weather_edit_mode(message.from_user.id, self.second_phase)
+            bot.send_message(message.chat.id, 'Возможно, тут какая-то ошибка..\n'
+                                              'Проверьте правильность названия\n '
+                                              'введенного места, и попробуйте\n'
+                                              'найти его ещё раз')
 
+        else:
+            bot.send_message(message.chat.id, 'Пожалуйста, введите номер нужной строки')
+
+    @check_time
     def weather_place_mode(self, message, db, bot):
         """Режим настройки места для вывода погоды пользователю
         :param message - сообщение пользователя
@@ -123,6 +163,7 @@ class MasterOfWeather:
         elif phase == self.third_phase:
             self._third_phase_to_set_place(message, db, bot)
 
+    @check_time
     def get_weather_info(self, db, message):
         """Метод позволяет спарсить погоду сайта Яндекс
         :param message - сообщение пользователя
@@ -130,14 +171,20 @@ class MasterOfWeather:
 
         day_parts = ['Утро', 'День', 'Вечер', 'Ночь']
         day_txt = 'завтра' if 'завтра' in message.text.lower() else 'сегодня'
-        place_url, place_name = db.get_place_info_of_user_by_user_id(message.from_user.id)
+        place_url, place_name, region_name = db.get_place_info_of_user_by_user_id(message.from_user.id)
 
-        weather = [self._parse_weather_info(day_part, day_txt, place_url) for day_part in day_parts]
-        weather.insert(0, day_txt)  # День, когда смотрим погоду
-        weather.insert(0, place_name)
+        weather_site = '{}/details#{}'.format(place_url, self.cur_day)
+        response = requests.get(weather_site)
+        bs = bs4.BeautifulSoup(response.text, "html.parser")
 
-        return '{0}: {1} погода такая\n{2}{3}{4}{5}'.format(*weather)
+        weather = [self._parse_weather_info(day_part, day_txt, bs) for day_part in day_parts]
+        weather.insert(0, place_name)  # Название города
+        weather.insert(1, region_name)  # Название области
+        weather.insert(2, day_txt)  # День, когда смотрим погоду
 
+        return '{0} ({1})\nПогода на {2}\n{3}{4}{5}{6}'.format(*weather)
+
+    @check_time
     def set_buttons(self, *buttons):
         """Метод размещает под панелью клавиатуры одну или несколько кнопок
         :param buttons - текст кнопок
@@ -149,18 +196,15 @@ class MasterOfWeather:
 
         return markup
 
-    def _parse_weather_info(self, day_part, day_txt, place_url):
+    @check_time
+    def _parse_weather_info(self, day_part, day_txt, bs):
         """Вспомогательный метод, парсит погоду
         :param day_part - Время дня (Утро/День/Вечер/Ночь)
         :param day_txt - на какой день выводить погоду (сегодня/завтра)
-        :param place_url - url, по которому находим населенный пункт
+        :param bs - экземпляр bs, содержащий результат запроса к Яндекс.Погода
         """
 
         day_elm = self.today_elm if day_txt == 'сегодня' else self.tomorrow_elm
-
-        weather_site = '{}/details#{}'.format(place_url, self.cur_day)
-        response = requests.get(weather_site)
-        bs = bs4.BeautifulSoup(response.text, "html.parser")
 
         # Температуры на утро, день, вечер и ночь в яндексе идут один за другим
         day_query = {'Утро': '1', 'День': '2', 'Вечер': '3', 'Ночь': '4'}
@@ -180,6 +224,7 @@ class MasterOfWeather:
 
         return '\n{}: {} {}'.format(day_part, temp_str, condition_emodji)
 
+    @check_time
     def _get_emoji(self, condition, day_part):
         """Возвращает смайлик, соответствующий погодным условиям
         :param condition - погодные условия
@@ -208,6 +253,7 @@ class MasterOfWeather:
 class CommunicationManager:
     """Класс для общения с людьми"""
 
+    @check_time
     def get_bot_answer(self, message):
         """Метод отвечает на сообщение пользователя
         :param message - сообщение пользователя
@@ -221,6 +267,7 @@ class CommunicationManager:
 
         return response_json['result']['fulfillment']['speech']  # Разбираем JSON и вытаскиваем ответ
 
+    @check_time
     def is_weather_question(self, message):
         """Метод проверяет, не о погоде ли спросили бота
         :param message сообщение боту
@@ -234,6 +281,7 @@ class CommunicationManager:
 
         return False
 
+    @check_time
     def is_skill_question(self, message):
         """Метод проверяет, не про возможности ли бота был задан вопрос
         :param message - сообщение юзера
