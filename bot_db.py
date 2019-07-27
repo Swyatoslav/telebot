@@ -1,6 +1,23 @@
 import datetime
-
+import time
 import psycopg2
+
+
+def check_time(func):
+    """"""
+
+    def wrapper(self, *args, **kwargs):
+        start_time = time.time()
+        method_name = func.__name__
+        result = func(self, *args, **kwargs)
+        if method_name.startswith('_'):
+            print('подметод {} выполнялся: {}'.format(func.__name__, time.time() - start_time))
+        else:
+            print('метод {} выполнялся: {}'.format(func.__name__, time.time() - start_time))
+
+        return result
+
+    return wrapper
 
 
 class DBManager:
@@ -19,6 +36,7 @@ class DBManager:
                                      port='5432')
         self.cursor = self.conn.cursor()
 
+    @check_time
     def _is_uid_exists(self, uid):
         self.cursor.execute('SELECT id from admin.users WHERE id = {}'.format(uid))
         result = self.cursor.fetchone()
@@ -27,6 +45,7 @@ class DBManager:
 
         return True
 
+    @check_time
     def set_user_info(self, func):
         """Метод записывает в БД инфу про юзера"""
 
@@ -46,6 +65,7 @@ class DBManager:
 
         return wrapper
 
+    @check_time
     def set_unknown_message_info(self, message):
         """Метод записывает информацию о нераспознанном сообщении в базу"""
 
@@ -71,6 +91,7 @@ class DBManager:
 
         self.conn.commit()
 
+    @check_time
     def get_unknown_massage_info(self):
         """Метод выдает информацию о нераспознанном сообщении из базы"""
 
@@ -87,6 +108,7 @@ class DBManager:
 
         return my_unknown_msg
 
+    @check_time
     def delete_all_unknown_messages(self):
         """Метод очищает всю таблицу"""
 
@@ -95,6 +117,7 @@ class DBManager:
 
         return 'Неопознанные сообщения стерты'
 
+    @check_time
     def is_admin_id(self, user_id):
         """Метод проверяет, id админа передано или нет"""
 
@@ -103,6 +126,7 @@ class DBManager:
 
         return self.cursor.fetchone()[0] == user_id
 
+    @check_time
     def set_regions_info(self, region_hrefs, region_names):
         """Метод записывает в базу информацию о регионах яндекс.погоды
         :param region_hrefs - списов ссылок на регионы в яндекс.погоде
@@ -120,6 +144,7 @@ class DBManager:
                                 '%s, %s, %s);', (region_id, region_names[i], region_hrefs[i]))
             self.conn.commit()
 
+    @check_time
     def set_places_info(self, places_info):
         for i in range(len(places_info)):
             region_name = next(iter(places_info[i]))
@@ -134,6 +159,7 @@ class DBManager:
                                                          places_info[i][region_name][0][j]))
                 self.conn.commit()
 
+    @check_time
     def get_weather_edit_mode_stage(self, user_id):
         """Проверяем, не идет ли настройка погоды у пользователя"""
 
@@ -143,6 +169,7 @@ class DBManager:
 
         return result[0]
 
+    @check_time
     def is_weather_place_set(self, user_id):
         """Метод проверяет, выставлен ли город для определения погоды
         :param user_id - id пользователя
@@ -154,6 +181,7 @@ class DBManager:
 
         return result[0]
 
+    @check_time
     def set_weather_edit_mode(self, user_id, stage):
         """Выставляем флаг начала настройки погоды
         :param user_id - id пользователя
@@ -165,6 +193,7 @@ class DBManager:
 
         return 'Выставлен режим настройки: {}'.format(stage)
 
+    @check_time
     def get_place_info_by_name(self, text):
         """Метод выдергивает информацию о населенном пункте по его названию
         :param - текст, по которому ищем населенный пункт
@@ -172,13 +201,14 @@ class DBManager:
 
         self.cursor.execute('SELECT id, region_name, place_name, place_href	'
                             'FROM admin.places '
-                            'WHERE place_name ILIKE %s', [text])
+                            "where place_name ~* %s;", [text])
         self.conn.commit()
 
         result = self.cursor.fetchall()
 
         return result
 
+    @check_time
     def set_place_id_to_user(self, place_id, user_id):
         """Метод записывает id населенного пункта в информацию юзера
         :param place_id - id населенного пункта
@@ -188,6 +218,7 @@ class DBManager:
         self.cursor.execute('UPDATE admin.users	SET weather_place_id=%s	WHERE id=%s;', (place_id, user_id))
         self.conn.commit()
 
+    @check_time
     def get_place_info_of_user_by_user_id(self, user_id):
         """Метод возвращает id места по id юзера
         :param user_id - id юзера
@@ -195,12 +226,13 @@ class DBManager:
 
         self.cursor.execute('SELECT weather_place_id FROM admin.users WHERE id=%s', [user_id])
         place_id = self.cursor.fetchone()[0]
-        self.cursor.execute('SELECT place_href, place_name FROM admin.places WHERE id=%s;', [place_id])
+        self.cursor.execute('SELECT place_href, place_name, region_name FROM admin.places WHERE id=%s;', [place_id])
         place_info = self.cursor.fetchone()
         self.conn.commit()
 
         return place_info
 
+    @check_time
     def create_tmp_table_for_search_place(self, user_id):
         """Метод создает временную таблицу для хранения промежуточных значений результатов поиска
         :param user_id - id юзера
@@ -212,6 +244,7 @@ class DBManager:
                             'CREATE TABLE {}\n'
                             '(\n'
                             'id integer NOT NULL,\n'
+                            'place_id integer NOT NULL,\n'
                             'region_name text COLLATE pg_catalog."default" NOT NULL,\n'
                             'place_name text COLLATE pg_catalog."default" NOT NULL,\n'
                             'place_href text COLLATE pg_catalog."default" NOT NULL)\n'
@@ -226,6 +259,7 @@ class DBManager:
 
         return table_name
 
+    @check_time
     def set_tmp_result_of_search_weather_place(self, table_name, result):
         """Метод записывает удачный результат поиска во временную таблицу
         :param table_name - название временной таблицы
@@ -233,17 +267,53 @@ class DBManager:
         """
 
         for result_line in result:
+            self.cursor.execute("SELECT id from {} order by id desc limit 1".format(table_name))
+            result = self.cursor.fetchone()
+            self.conn.commit()
+
+            # Проверяем id. Если база пустая, задаем id = 1 Для избежания ошибки при записи
+            tmp_id = 1 if not result else result[0] + 1
+
             self.cursor.execute('INSERT INTO {}('
-                                'id, region_name, place_name, place_href) VALUES ('
-                                '%s, %s, %s, %s);'.format(table_name), (result_line[0],
+                                'id, place_id, region_name, place_name, place_href) VALUES ('
+                                '%s, %s, %s, %s, %s);'.format(table_name), (tmp_id, result_line[0],
                                                                         result_line[1], result_line[2], result_line[3]))
             self.conn.commit()
 
-    def get_info_from_tmp_weather_places(self, tmp_table):
-        """Метод вытаскивает информацию о поиске из временной таблицы"""
+    @check_time
+    def get_all_info_from_tmp_weather_places(self, tmp_table):
+        """Метод вытаскивает всю информацию о поиске из временной таблицы
+        :param tmp_table - название временной таблицы
+        """
 
-        self.cursor.execute('SELECT id, region_name, place_name, place_href FROM {};'.format(tmp_table))
+        self.cursor.execute('SELECT * FROM {};'.format(tmp_table))
         result = self.cursor.fetchall()
+        self.conn.commit()
+
+        return result
+
+    @check_time
+    def get_some_info_from_tmp_weather_places(self, tmp_table, row_id):
+        """Метод вытаскивает некоторую информацию из временной таблицы
+        :param tmp_table - название временной таблицы
+        :param row_id - id во временной таблице
+        """
+
+        self.cursor.execute('SELECT * FROM {} WHERE id =%s;'.format(tmp_table), [row_id])
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result
+
+    @check_time
+    def get_max_id_from_tmp_weather_places(self, tmp_table):
+        """Метод вытаскивает последний id из временной таблицы резульаттов
+        :param tmp_table - название временной таблицы
+        :param row_id - id во временной таблице
+        """
+
+        self.cursor.execute("SELECT id from {} order by id desc limit 1".format(tmp_table))
+        result = self.cursor.fetchone()
         self.conn.commit()
 
         return result
