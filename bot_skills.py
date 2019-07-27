@@ -66,32 +66,27 @@ class MasterOfWeather:
         :param bot - экземпляр бота
         """
 
+        info_msg1 = 'Возможно, название населенного пункта введено неверно.\nПопробуйте ещё раз.'
+        info_msg2 = 'Найдено несколько совпадений\nПосмотрите результаты и введите\nномер строки с верным результатом.'
+
         tmp_table = 'admin.user_{}_tmp'.format(message.from_user.id)
 
         if 'верно' in message.text.lower() and not 'не' in message.text.lower():
             tmp_result = db.get_all_info_from_tmp_weather_places(tmp_table)
-            db.set_place_id_to_user(tmp_result[0][1], message.from_user.id)
-            db.set_weather_edit_mode(message.from_user.id, None)
-            bot.send_message(message.chat.id,
-                             'Настройка успешно завершена :)\nСохранено: {}, {}\nСпрашивайте погоду\n'.format(
-                                 tmp_result[0][3], tmp_result[0][2]),
-                             reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
+            self._set_place_id_and_complete_weather_mode(message, db, bot, tmp_result)
             return
 
         result = db.get_place_info_by_name(message.text)
-        if not result:
-            bot.send_message(message.chat.id, 'Возможно, название населенного пункта введено неверно.\n'
-                                              'Попробуйте ещё раз.',
-                             reply_markup=self.set_buttons(self.button1))
-        elif len(result) > 1:
-            tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)
-            db.set_tmp_result_of_search_weather_place(tmp_table, result)
-            db.set_weather_edit_mode(message.from_user.id, self.third_phase)
-            bot.send_message(message.chat.id, 'Найдено более одного совпадения\n'
-                                              'Пожалуйста, посмотрите результаты\n'
-                                              'и введите номер строки с верным результатом.',
-                             reply_markup=self.set_buttons('Моего здесь нет'))
+        if not result:  # результаты поиска отсутствуют
+            bot.send_message(message.chat.id, info_msg1, reply_markup=self.set_buttons(self.button1))
+        elif len(result) > 1:  # найдено несколько результатов
+            tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)  # создаем временную таблицу
+            db.set_tmp_result_of_search_weather_place(tmp_table, result)  # записываем результаты во временную таблицу
+            db.set_weather_edit_mode(message.from_user.id, self.third_phase)  # переходим к фазе выбора нужного места
+            bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons('Моего здесь нет'))
             result_list = db.get_all_info_from_tmp_weather_places(tmp_table)
+
+            # формируем сообщение с вариантами выбора из найденных результатов поиска
             result_msg = ''
             for res_line in result_list:
                 result_msg += '{}. {}, {}\n'.format(res_line[0], res_line[3], res_line[2])
@@ -112,33 +107,40 @@ class MasterOfWeather:
         """
 
         tmp_table = 'admin.user_{}_tmp'.format(message.from_user.id)
+        info_msg1 = 'Указанной вами строки нет в предложенном списке..\nВведите номер ещё раз'
+        info_msg2 = 'Возможно, тут какая-то ошибка..\nПроверьте правильность названия\n' \
+                    'введенного места, и попробуйте\nнайти его ещё раз'
+        info_msg3 = 'Пожалуйста, введите номер нужной строки'
 
         if message.text.isdigit():
             if int(message.text) in range(1, int(db.get_max_id_from_tmp_weather_places(tmp_table)[0] + 1)):
                 tmp_result = db.get_some_info_from_tmp_weather_places(tmp_table, int(message.text))
-                db.set_place_id_to_user(tmp_result[1], message.from_user.id)
-                db.set_weather_edit_mode(message.from_user.id, None)
-                bot.send_message(message.chat.id,
-                                 'Настройка успешно завершена :)\n'
-                                 'Сохранено: {}, {}\n'
-                                 'Выберите нужную кнопку\n'.format(
-                                     tmp_result[3], tmp_result[2]),
-                                 reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
-
+                self._set_place_id_and_complete_weather_mode(message, db, bot, tmp_result)
 
             else:
-                bot.send_message(message.chat.id, 'Указанной вами строки нет в предложенном списке..\n'
-                                                  'Введите номер ещё раз')
-
+                bot.send_message(message.chat.id, info_msg1)
         elif 'моего здесь нет' in message.text.lower():
             db.set_weather_edit_mode(message.from_user.id, self.second_phase)
-            bot.send_message(message.chat.id, 'Возможно, тут какая-то ошибка..\n'
-                                              'Проверьте правильность названия\n '
-                                              'введенного места, и попробуйте\n'
-                                              'найти его ещё раз')
-
+            bot.send_message(message.chat.id, info_msg2)
         else:
-            bot.send_message(message.chat.id, 'Пожалуйста, введите номер нужной строки')
+            bot.send_message(message.chat.id, info_msg3)
+
+    @check_time
+    def _set_place_id_and_complete_weather_mode(self, message, db, bot, result_info):
+        """Метод записывает id места пользователю и завершает настройку погоды
+        :param message - сообщение пользователя
+        :param db - экземпляр БД
+        :param bot - экземпляр бота
+        """
+
+        db.set_place_id_to_user(result_info[1], message.from_user.id)  # Записываем id места юзеру в таблицу
+        db.set_weather_edit_mode(message.from_user.id, None)  # Закрываем режим настройки
+        bot.send_message(message.chat.id,
+                         'Настройка успешно завершена :)\n'
+                         'Сохранено: {}, {}\n'
+                         'Выберите нужную кнопку\n'.format(
+                             result_info[3], result_info[2]),
+                         reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
 
     @check_time
     def weather_place_mode(self, message, db, bot):

@@ -10,10 +10,8 @@ def check_time(func):
         start_time = time.time()
         method_name = func.__name__
         result = func(self, *args, **kwargs)
-        if method_name.startswith('_'):
-            print('подметод {} выполнялся: {}'.format(func.__name__, time.time() - start_time))
-        else:
-            print('метод {} выполнялся: {}'.format(func.__name__, time.time() - start_time))
+        func_type = 'подметод' if method_name.startswith('_') else 'метод'
+        print('{} {} выполнялся: {}'.format(func_type ,func.__name__, time.time() - start_time))
 
         return result
 
