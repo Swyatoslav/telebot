@@ -315,3 +315,12 @@ class DBManager:
         self.conn.commit()
 
         return result
+
+    @check_time
+    def drop_tmp_table(self, table_name):
+        """Метод удаляет временную таблицу из бд
+        :param table_name - название временной таблицы
+        """
+
+        self.cursor.execute("DROP TABLE {};".format(table_name))
+        self.conn.commit()

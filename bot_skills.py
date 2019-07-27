@@ -73,7 +73,7 @@ class MasterOfWeather:
 
         if 'верно' in message.text.lower() and not 'не' in message.text.lower():
             tmp_result = db.get_all_info_from_tmp_weather_places(tmp_table)
-            self._set_place_id_and_complete_weather_mode(message, db, bot, tmp_result)
+            self._set_place_id_and_complete_weather_mode(message, db, bot, tmp_result, tmp_table)
             return
 
         result = db.get_place_info_by_name(message.text)
@@ -115,7 +115,7 @@ class MasterOfWeather:
         if message.text.isdigit():
             if int(message.text) in range(1, int(db.get_max_id_from_tmp_weather_places(tmp_table)[0] + 1)):
                 tmp_result = db.get_some_info_from_tmp_weather_places(tmp_table, int(message.text))
-                self._set_place_id_and_complete_weather_mode(message, db, bot, tmp_result)
+                self._set_place_id_and_complete_weather_mode(message, db, bot, tmp_result, tmp_table)
 
             else:
                 bot.send_message(message.chat.id, info_msg1)
@@ -126,13 +126,16 @@ class MasterOfWeather:
             bot.send_message(message.chat.id, info_msg3)
 
     @check_time
-    def _set_place_id_and_complete_weather_mode(self, message, db, bot, result_info):
+    def _set_place_id_and_complete_weather_mode(self, message, db, bot, result_info, tmp_table):
         """Метод записывает id места пользователю и завершает настройку погоды
         :param message - сообщение пользователя
         :param db - экземпляр БД
         :param bot - экземпляр бота
+        :param result_info - вся информация по нужному месту
+        :param tmp_table - название временной таблицы
         """
 
+        db.drop_tmp_table(tmp_table)
         db.set_place_id_to_user(result_info[1], message.from_user.id)  # Записываем id места юзеру в таблицу
         db.set_weather_edit_mode(message.from_user.id, None)  # Закрываем режим настройки
         bot.send_message(message.chat.id,
