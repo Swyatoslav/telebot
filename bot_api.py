@@ -9,10 +9,10 @@ from bot_config import ConfigManager
 from bot_db import DBManager
 from bot_logging import LogManager
 from bot_skills import MasterOfWeather, CommunicationManager
+from bot_consts import ConstantManager
 
 # Создадим конфиг
-config_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'config.ini')
-config = ConfigManager().create_config(config_path)
+config = ConfigManager().create_config(ConstantManager.config_path)
 
 # Запишем токен
 with open(os.path.join(config.get('general', 'settings_path'), 'token.txt'), 'r') as token_file:

@@ -1,6 +1,10 @@
 import datetime
 import time
 import psycopg2
+from telebot.types import Message
+from bot_logging import LogManager
+from bot_consts import ConstantManager
+from bot_config import ConfigManager
 
 
 def check_time(func):
@@ -8,10 +12,20 @@ def check_time(func):
 
     def wrapper(self, *args, **kwargs):
         start_time = time.time()
-        method_name = func.__name__
+        func_name = func.__name__
         result = func(self, *args, **kwargs)
-        func_type = 'подметод' if method_name.startswith('_') else 'метод'
-        print('{} {} выполнялся: {}'.format(func_type ,func.__name__, time.time() - start_time))
+        exec_time = round(time.time() - start_time, 4)
+        user_msg = None
+        user_id = None
+        config = ConfigManager.create_config(ConstantManager.config_path)
+        for arg in args:
+            if isinstance(arg, Message):
+                user_msg = arg.text
+                user_id = arg.from_user.id
+                break
+
+        if exec_time > float(config.get('general', 'exec_time')):
+            LogManager.write_log_file(func_name, exec_time, user_msg, user_id)
 
         return result
 
