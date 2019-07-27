@@ -10,10 +10,8 @@ def check_time(func):
         start_time = time.time()
         method_name = func.__name__
         result = func(self, *args, **kwargs)
-        if method_name.startswith('_'):
-            print('подметод {} выполнялся: {}'.format(func.__name__, time.time() - start_time))
-        else:
-            print('метод {} выполнялся: {}'.format(func.__name__, time.time() - start_time))
+        func_type = 'подметод' if method_name.startswith('_') else 'метод'
+        print('{} {} выполнялся: {}'.format(func_type ,func.__name__, time.time() - start_time))
 
         return result
 
@@ -317,3 +315,12 @@ class DBManager:
         self.conn.commit()
 
         return result
+
+    @check_time
+    def drop_tmp_table(self, table_name):
+        """Метод удаляет временную таблицу из бд
+        :param table_name - название временной таблицы
+        """
+
+        self.cursor.execute("DROP TABLE {};".format(table_name))
+        self.conn.commit()
