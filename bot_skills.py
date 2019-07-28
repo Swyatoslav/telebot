@@ -72,7 +72,7 @@ class MasterOfWeather:
         tmp_table = 'admin.user_{}_tmp'.format(message.from_user.id)
 
         if 'верно' in message.text.lower() and not 'не' in message.text.lower():
-            tmp_result = db.get_all_info_from_tmp_weather_places(tmp_table)
+            tmp_result = db.get_some_info_from_tmp_weather_places(tmp_table)
             self._set_place_id_and_complete_weather_mode(message, db, bot, tmp_result, tmp_table)
             return
 
@@ -135,7 +135,6 @@ class MasterOfWeather:
         :param tmp_table - название временной таблицы
         """
 
-        db.drop_tmp_table(tmp_table)
         db.set_place_id_to_user(result_info[1], message.from_user.id)  # Записываем id места юзеру в таблицу
         db.set_weather_edit_mode(message.from_user.id, None)  # Закрываем режим настройки
         bot.send_message(message.chat.id,
@@ -144,6 +143,7 @@ class MasterOfWeather:
                          'Выберите нужную кнопку\n'.format(
                              result_info[3], result_info[2]),
                          reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
+        db.drop_tmp_table(tmp_table)
 
     @check_time
     def weather_place_mode(self, message, db, bot):

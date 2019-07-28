@@ -305,7 +305,7 @@ class DBManager:
         return result
 
     @check_time
-    def get_some_info_from_tmp_weather_places(self, tmp_table, row_id):
+    def get_some_info_from_tmp_weather_places(self, tmp_table, row_id=1):
         """Метод вытаскивает некоторую информацию из временной таблицы
         :param tmp_table - название временной таблицы
         :param row_id - id во временной таблице
