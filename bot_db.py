@@ -1,6 +1,13 @@
 import datetime
 import time
+from random import randint
+
 import psycopg2
+from telebot.types import Message
+
+from bot_config import ConfigManager
+from bot_consts import ConstantManager
+from bot_logging import LogManager
 
 
 def check_time(func):
@@ -8,10 +15,20 @@ def check_time(func):
 
     def wrapper(self, *args, **kwargs):
         start_time = time.time()
-        method_name = func.__name__
+        func_name = func.__name__
         result = func(self, *args, **kwargs)
-        func_type = 'подметод' if method_name.startswith('_') else 'метод'
-        print('{} {} выполнялся: {}'.format(func_type ,func.__name__, time.time() - start_time))
+        exec_time = round(time.time() - start_time, 4)
+        user_msg = None
+        user_id = None
+        config = ConfigManager.create_config(ConstantManager.config_path)
+        for arg in args:
+            if isinstance(arg, Message):
+                user_msg = arg.text
+                user_id = arg.from_user.id
+                break
+
+        if exec_time > float(config.get('general', 'exec_time')):
+            LogManager.write_log_file(func_name, exec_time, user_msg, user_id)
 
         return result
 
@@ -275,7 +292,8 @@ class DBManager:
             self.cursor.execute('INSERT INTO {}('
                                 'id, place_id, region_name, place_name, place_href) VALUES ('
                                 '%s, %s, %s, %s, %s);'.format(table_name), (tmp_id, result_line[0],
-                                                                        result_line[1], result_line[2], result_line[3]))
+                                                                            result_line[1], result_line[2],
+                                                                            result_line[3]))
             self.conn.commit()
 
     @check_time
@@ -291,7 +309,7 @@ class DBManager:
         return result
 
     @check_time
-    def get_some_info_from_tmp_weather_places(self, tmp_table, row_id):
+    def get_some_info_from_tmp_weather_places(self, tmp_table, row_id=1):
         """Метод вытаскивает некоторую информацию из временной таблицы
         :param tmp_table - название временной таблицы
         :param row_id - id во временной таблице
@@ -324,3 +342,172 @@ class DBManager:
 
         self.cursor.execute("DROP TABLE {};".format(table_name))
         self.conn.commit()
+
+    @check_time
+    def set_city_feature(self, city_name):
+        """Метод задает населенному пункту в таблице признак города
+        :param city_name - название города
+        """
+
+        self.cursor.execute('SELECT id FROM admin.places '
+                            "where place_name ILIKE %s", [city_name])
+        self.conn.commit()
+
+        place_id = self.cursor.fetchone()
+        if place_id:
+            place_id = place_id[0]
+            self.cursor.execute('UPDATE admin.places SET is_city=TRUE WHERE id = %s;', [place_id])
+            self.conn.commit()
+        else:
+            print('В списке городов не найден: {}'.format(city_name))
+
+    def set_game_cities_mode(self, user_id, stage):
+        """Метод записывает в БД название этапа игры (Вступление/Игра)
+        :param user_id - id пользователя
+        :param stage - название этапа
+        """
+
+        self.cursor.execute("UPDATE admin.users	SET game_cities=%s WHERE id=%s;", (stage, user_id))
+        self.conn.commit()
+
+    @check_time
+    def get_game_cities_mode_stage(self, user_id):
+        """Проверяем, не идет ли игра Города у пользователя"""
+
+        self.cursor.execute('SELECT game_cities FROM admin.users where id=%s', [user_id])
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result[0]
+
+    def create_tmp_game_cities_table(self, user_id):
+        """Метод создает игровую таблицу для игры Города
+        :param user_id - id пользователя
+        """
+
+        part_table_name = '{}{}'.format('cities_', user_id)
+        full_table_name = 'admin.{}'.format(part_table_name)
+
+        self.cursor.execute(""" DROP TABLE IF EXISTS {1};
+                                CREATE TABLE {1}(
+                                id integer NOT NULL,
+                                place_id integer NOT NULL,
+                                city_name text NOT NULL,
+                                is_bot boolean NOT NULL,
+                                CONSTRAINT {0}_pkey PRIMARY KEY (id));""".format(part_table_name, full_table_name))
+        self.conn.commit()
+
+        return full_table_name
+
+    def set_new_city_in_game_table(self, user_id, city_id, city_name, is_bot):
+        """Метод записывает новый город в игрвую таблицу
+        :param user_id - id юзера
+        :param city_id - id города
+        :param city_name - название города
+        :param is_bot - город назвал бот
+        """
+
+        table_name = '{}{}'.format('admin.cities_', user_id)
+
+        self.cursor.execute("SELECT id from {} order by id desc limit 1".format(table_name))
+        result = self.cursor.fetchone()
+        self.conn.commit()
+        tmp_id = 1 if not result else result[0] + 1
+
+        self.cursor.execute(
+            """INSERT INTO {}(id, place_id, city_name, is_bot)VALUES (%s, %s, %s, %s);""".format(table_name),
+            (tmp_id, city_id, city_name, is_bot))
+        self.conn.commit()
+
+    def select_random_city_against_user_city(self, user_id, city_name):
+        """Метод возвращает случайный город, основываясь на городе пользователя
+        :param user_id - id юзера
+        :param city_name - название города
+        """
+
+        table_name = '{}{}'.format('admin.cities_', user_id)
+
+        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы']:
+            last_let = city_name[-2]
+        else:
+            last_let = city_name[-1]
+
+        # Получаем список оставшихся городов на эту букву
+        self.cursor.execute(
+            "select id, place_name from admin.places WHERE place_name ilike '{}%' "
+            "AND is_city=True "
+            "AND id NOT IN "
+            "(select place_id from {})".format(last_let, table_name))
+        self.conn.commit()
+        all_list = self.cursor.fetchall()
+        random_int = randint(0, len(all_list) - 1)
+
+        # Выбираем случайный город из списка
+        random_city_id = all_list[random_int][0]
+        random_city_name = all_list[random_int][1]
+
+        # Записываем в игровую таблицу новый город
+        self.set_new_city_in_game_table(user_id, random_city_id, random_city_name, True)
+
+        return random_city_name
+
+    def is_city_exists(self, city):
+        """Метод ищет город названный пользователем в базе
+        :param city - название города
+        """
+
+        self.cursor.execute("SELECT id from admin.places where place_name ilike %s ", [city])
+        self.conn.commit()
+        result = self.cursor.fetchone()
+
+        if result:
+            return result[0]
+
+        return False
+
+    def is_city_was_called(self, city_name, user_id):
+        """Метод ищет город названный пользователем в уже названных
+        :param city_name - название города
+        :param city_id - id города
+        :param user_id - id пользователя
+        """
+
+        table_name = '{}{}'.format('admin.cities_', user_id)
+
+        self.cursor.execute("select place_id from {} where city_name ilike %s".format(table_name), [city_name])
+        self.conn.commit()
+        result = self.cursor.fetchone()
+
+        if result:
+            return True
+
+        return False
+
+    def is_city_starts_with_end_letter(self, user_id, user_city, city_id):
+        """Метод проверяет, действительно ли названный город начинается на ту букву, которой закончился предыдущий
+        :param user_id - id пользователя
+        :param user_city - город названный пользователем
+        """
+
+        table_name = '{}{}'.format('admin.cities_', user_id)
+
+        self.cursor.execute("SELECT city_name from {} order by id desc limit 1".format(table_name))
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        if not result:  # Если это наш первый город
+            self.set_new_city_in_game_table(user_id, city_id, user_city, False)
+            return True
+        else:
+            city_name = result[0]
+
+        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы']:
+            last_let = city_name[-2]
+        else:
+            last_let = city_name[-1]
+
+        if last_let == user_city[0].lower():
+            self.set_new_city_in_game_table(user_id, city_id, user_city, False)
+            return True
+        else:
+            return False

@@ -4,7 +4,8 @@ import os
 
 class ConfigManager:
 
-    def create_config(self, path):
+    @staticmethod
+    def create_config(path):
         """Метод создает файл конфига
         :param path - путь до будущего конфига
         """
@@ -16,6 +17,7 @@ class ConfigManager:
             config.set("general", "db_user_name", "postgres")
             config.set("general", "db_user_password", "")
             config.set("general", 'settings_path', 'C:\\Projects')
+            config.set("general", 'exec_time', '0.5')
 
             with open(path, "w") as config_file:
                 config.write(config_file)
