@@ -17,8 +17,8 @@ class MasterOfWeather:
     today_elm = ".forecast-details>dd:nth-child(2)"
     tomorrow_elm = '.forecast-details>dd:nth-child(5)'
 
-    button1 = 'Прервать настройку'
-    button2 = 'Продолжить настройку'
+    btn1 = 'Прервать настройку'
+    btn2 = 'Продолжить настройку'
 
     first_phase = 'Начало настройки'
     second_phase = 'Поиск города'
@@ -28,15 +28,15 @@ class MasterOfWeather:
     def _hello_from_mow(self, message, db, bot):
         """Метод здоровается с пользователем и включает 1 фазу редактирования погоды"""
 
-        mow_hello_msg = 'Здравствуйте :) Меня зовут Мастер над погодой.\n' \
-                        'Давайте определим город, в котором вам интересна погода.\n' \
-                        'Это делается всего один раз, но при желании\n' \
-                        'вы сможете потом поменять город командой /new_weather '
+        info_msg1 = 'Здравствуйте :) Меня зовут Мастер над погодой.\n' \
+                    'Давайте определим город, в котором вам интересна погода.\n' \
+                    'Это делается всего один раз, но при желании\n' \
+                    'вы сможете потом поменять город командой /new_weather '
+        info_msg2 = 'Выберите, пожалуйста, нужную кнопку :)'
 
-        bot.send_message(message.chat.id, mow_hello_msg)
+        bot.send_message(message.chat.id, info_msg1)
         db.set_weather_edit_mode(message.from_user.id, self.first_phase)
-        bot.send_message(message.chat.id, 'Выберите, пожалуйста, нужную кнопку :)',
-                         reply_markup=self.set_buttons(self.button1, self.button2))
+        bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons(self.btn1, self.btn2))
 
     @check_time
     def _first_phase_to_set_place(self, message, db, bot):
@@ -47,16 +47,18 @@ class MasterOfWeather:
         :param bot - экземпляр бота
         """
 
-        if self.button2 in message.text:
+        info_msg1 = 'Хорошо, начнем настройку :)'
+        info_msg2 = 'Введите, пожалуйста, название своего\n'\
+                    'населенного пункта (без слов "Город", "Деревня" и тп.)\n\n'\
+                    'Прошу вас вводить название без ошибок :)'
+        info_msg3 = 'Вы находитесь в режиме настройки погоды. Прервать настройку?'
+
+        if self.btn2 in message.text:
             db.set_weather_edit_mode(message.from_user.id, self.second_phase)
-            bot.send_message(message.chat.id, 'Хорошо, начнем настройку :)')
-            bot.send_message(message.chat.id, 'Введите, пожалуйста, название своего\n'
-                                              'населенного пункта (без слов "Город", "Хутор" и тп.)\n\n'
-                                              'Прошу вас вводить название без ошибок :)',
-                             reply_markup=self.set_buttons(self.button1))
+            bot.send_message(message.chat.id, info_msg1)
+            bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons(self.btn1))
         else:
-            bot.send_message(message.chat.id, 'Вы находитесь в режиме настройки погоды. Прервать настройку?',
-                             reply_markup=self.set_buttons(self.button1, self.button2))
+            bot.send_message(message.chat.id, info_msg3, reply_markup=self.set_buttons(self.btn1, self.btn2))
 
     @check_time
     def _second_phase_to_set_place(self, message, db, bot):
@@ -78,7 +80,7 @@ class MasterOfWeather:
 
         result = db.get_place_info_by_name(message.text)
         if not result:  # результаты поиска отсутствуют
-            bot.send_message(message.chat.id, info_msg1, reply_markup=self.set_buttons(self.button1))
+            bot.send_message(message.chat.id, info_msg1, reply_markup=self.set_buttons(self.btn1))
         elif len(result) > 1:  # найдено несколько результатов
             tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)  # создаем временную таблицу
             db.set_tmp_result_of_search_weather_place(tmp_table, result)  # записываем результаты во временную таблицу
@@ -135,14 +137,12 @@ class MasterOfWeather:
         :param tmp_table - название временной таблицы
         """
 
+        info_msg='Настройка успешно завершена :)\nСохранено: {}, {}\nВыберите нужную кнопку\n'.format(
+                             result_info[3], result_info[2])
+
         db.set_place_id_to_user(result_info[1], message.from_user.id)  # Записываем id места юзеру в таблицу
         db.set_weather_edit_mode(message.from_user.id, None)  # Закрываем режим настройки
-        bot.send_message(message.chat.id,
-                         'Настройка успешно завершена :)\n'
-                         'Сохранено: {}, {}\n'
-                         'Выберите нужную кнопку\n'.format(
-                             result_info[3], result_info[2]),
-                         reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
+        bot.send_message(message.chat.id, info_msg, reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
         db.drop_tmp_table(tmp_table)
 
     @check_time
@@ -153,8 +153,10 @@ class MasterOfWeather:
         :param bot - экземпляр бота
         """
 
-        if self.button1 in message.text or 'позже' in message.text:
-            bot.send_message(message.chat.id, 'Хорошо, настроим в другой раз :)')
+        info_msg = 'Хорошо, настроим в другой раз :)'
+
+        if self.btn1 in message.text or 'позже' in message.text:
+            bot.send_message(message.chat.id, info_msg)
             db.set_weather_edit_mode(message.from_user.id, None)
             return
 

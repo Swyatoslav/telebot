@@ -10,6 +10,7 @@ from bot_db import DBManager
 from bot_logging import LogManager
 from bot_skills import MasterOfWeather, CommunicationManager
 from bot_consts import ConstantManager
+from bot_games import CitiesGameManager
 
 # Создадим конфиг
 config = ConfigManager().create_config(ConstantManager.config_path)
@@ -25,6 +26,7 @@ hello_message = 'Привет! Я бета версия умного бота :)
 info_message = 'Вот что я умею:\n' \
                'Общаться, но пока что с трудом..\n' \
                'Говорить погоду /weather\n\n' \
+               'Играть в города /game_cities (beta)\n'\
                'Полный список команд вы увидите,\n' \
                'введя в поле сообщения \n(не отправляя) символ /\n\n' \
                'Ссылка на меня: \nhttp://t.me/svyat93_bot\n\n' \
@@ -34,10 +36,11 @@ db = DBManager(config.get('general', 'db'), config.get('general', 'db_user_name'
                config.get('general', 'db_user_password'))  # Соединение с бд
 cm = CommunicationManager()  # Общение с пользователем
 mow = MasterOfWeather()  # Работа с погодой
+cities_gm = CitiesGameManager()
 
 
 @db.set_user_info
-@bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather'])
+@bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather', 'game_cities'])
 @lm.log_message
 def start_message(message):
     if '/start' in message.text.lower():
@@ -60,10 +63,12 @@ def start_message(message):
                                           '{} ({})\n'
                                           'Если желаете изменить его, нажмите\n'
                                           'соответствующую кнопку'.format(result[1], result[2]),
-                                           reply_markup=mow.set_buttons('Желаю изменить', 'Оставлю как есть'))
+                                          reply_markup=mow.set_buttons('Желаю изменить', 'Оставлю как есть'))
     elif 'new_weather' in message.text and not db.is_weather_place_set(message.from_user.id):
         bot.send_message(message.chat.id,   'Чтобы поменять место, его нужно сначало установить :)\n'
                                             'Сделайте это с помощью команды /weather')
+    elif 'game_cities' in message.text:
+        cities_gm.game_mode(message, db, bot)
 
 
 @bot.message_handler(content_types=['text'])
@@ -75,6 +80,9 @@ def send_text(message):
     # Настройка вывода погоды
     if db.get_weather_edit_mode_stage(message.from_user.id):
         mow.weather_place_mode(message, db, bot)
+    # Игра Города
+    elif db.get_game_cities_mode_stage(message.from_user.id):
+        cities_gm.game_mode(message, db, bot)
     # Вывод погоды
     elif cm.is_weather_question(message.text):
         bot.send_message(message.chat.id, 'Секундочку')

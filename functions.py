@@ -74,6 +74,53 @@ def parse_places_info(region_hrefs, region_names):
     return all_places_info
 
 
+def parse_all_country_cities():
+    """Метод парсит города россии"""
+
+    site = 'https://ru.wikipedia.org/wiki/%D0%A1%D0%BF%D0%B8%D1%81%D0%BE%D0%BA' \
+           '_%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%BE%D0%B2_%D0%A0%D0%BE%D1%81%D1%81%D0%B8%D0%B8'
+
+    # Получаем страницу википедии с городами России
+    response = requests.get(site)
+    bs = bs4.BeautifulSoup(response.text, "html.parser")
+
+    # Получаем список строк с названиями городов
+    city_rows_elm = bs.select('table.sortable tr>td:nth-child(3) a')
+
+    # Получаем список title с названиями городов
+    city_titles = [re.compile('title="[\D\s]*"').findall(str(city))[0] for city in city_rows_elm]
+
+    # Получаем список названий городов
+    city_names = [re.compile('"[\D\s]*"').findall(city)[0][1:-1] for city in city_titles]
+
+    # Убираем указание города из названия
+    for i in range(len(city_names)):
+        if ' (' in city_names[i]:
+            city_names[i] = city_names[i][0: city_names[i].index(' (')]
+
+    # Убираем дубли из городов и лишнюю запись
+    unique_city_names = set(city_names)
+    unique_city_names.remove('Проблема принадлежности Крыма')
+
+    return unique_city_names
+
+
+city_names = parse_all_country_cities()
+for city_name in city_names:
+    db.set_city_feature(city_name)
+
+
+unknown_cities = ['Касимов', 'Руза', 'Артёмовск', 'Микунь', 'Починок',
+                  'Сельцо', 'Дюртюли', 'Очёр', 'Лысьва', 'Котлас', 'Семилуки',
+                  'Заозёрный', 'Гусиноозёрск', 'Ельня', 'Курлово', 'Сычёвка',
+                  'Новохопёрск', 'Щёлково', 'Олёкминск', 'Березники',
+                  'Кораблино', 'Покров', 'Стародуб', 'Щёкино', 'Ликино-Дулёво',
+                  'Миллерово', 'Семёнов', 'Пикалёво', 'Циолковский', 'Бирюч',
+                  'Рассказово', 'Янаул', 'Пестово', 'Пугачёв', 'Верея',
+                  'Истра', 'Белоозёрский', 'Бобров', 'Гуково', 'Инсар',
+                  'Мезень', 'Тимашёвск', 'Кремёнки', 'Лиски', 'Красавино']
+
+
 # region_hrefs, region_names = parse_regions_info()
 # all_places_info = parse_places_info(region_hrefs, region_names)
 # db.set_places_info(all_places_info)
