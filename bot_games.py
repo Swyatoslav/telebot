@@ -97,9 +97,14 @@ class CitiesGameManager:
         city_id = db.is_city_exists(message.text)
 
         if city_id:
-            if not db.is_city_was_called(message.text, city_id, message.from_user.id):
-                bot_city = db.select_random_city_against_user_city(message.from_user.id, message.text)
-                bot.send_message(message.chat.id, bot_city, reply_markup=self.set_buttons('Прервать игру'))
+            if not db.is_city_was_called(message.text, message.from_user.id):
+                if db.is_city_starts_with_end_letter(message.from_user.id, message.text, city_id):
+                    bot_city = db.select_random_city_against_user_city(message.from_user.id, message.text)
+                    bot.send_message(message.chat.id, bot_city, reply_markup=self.set_buttons('Прервать игру'))
+                else:
+                    bot.send_message(message.chat.id, 'Названный вами город начинается\n'
+                                                      ' не с последней буквы предыдущего! ',
+                                     reply_markup=self.set_buttons('Прервать игру'))
             else:
                 bot.send_message(message.chat.id, 'Город уже был назван! Введите другой',
                                  reply_markup=self.set_buttons('Прервать игру'))
