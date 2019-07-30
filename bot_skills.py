@@ -5,6 +5,7 @@ import apiai
 import bs4
 import requests
 from telebot import types
+from telebot.types import ReplyKeyboardRemove
 
 from bot_db import check_time
 
@@ -156,7 +157,7 @@ class MasterOfWeather:
         info_msg = 'Хорошо, настроим в другой раз :)'
 
         if self.btn1 in message.text or 'позже' in message.text:
-            bot.send_message(message.chat.id, info_msg)
+            bot.send_message(message.chat.id, info_msg, reply_markup=ReplyKeyboardRemove())
             db.set_weather_edit_mode(message.from_user.id, None)
             return
 

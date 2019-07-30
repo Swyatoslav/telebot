@@ -4,6 +4,7 @@ import time
 
 import requests
 import telebot
+from telebot.types import ReplyKeyboardRemove
 
 from bot_config import ConfigManager
 from bot_db import DBManager
@@ -26,11 +27,12 @@ hello_message = 'Привет! Я бета версия умного бота :)
 info_message = 'Вот что я умею:\n' \
                'Общаться, но пока что с трудом..\n' \
                'Говорить погоду /weather\n\n' \
-               'Играть в города /game_cities (beta)\n'\
+               'Играть в города /game_cities\n'\
                'Полный список команд вы увидите,\n' \
-               'введя в поле сообщения \n(не отправляя) символ /\n\n' \
+               'нажав на кнопку [ / ] справа от строки сообщения\n\n' \
                'Ссылка на меня: \nhttp://t.me/svyat93_bot\n\n' \
                'Повтор подсказок: /help\n'
+
 lm = LogManager()  # логирование
 db = DBManager(config.get('general', 'db'), config.get('general', 'db_user_name'),
                config.get('general', 'db_user_password'))  # Соединение с бд
@@ -44,19 +46,20 @@ cities_gm = CitiesGameManager()
 @lm.log_message
 def start_message(message):
     if '/start' in message.text.lower():
-        bot.send_message(message.chat.id, hello_message)
-        bot.send_message(message.chat.id, info_message)
+        bot.send_message(message.chat.id, hello_message, reply_markup=ReplyKeyboardRemove())
+        bot.send_message(message.chat.id, info_message, reply_markup=ReplyKeyboardRemove())
     elif '/weather' in message.text:
         bot.send_message(message.chat.id, 'Выберите одну из кнопок внизу',
                          reply_markup=mow.set_buttons('Погода сегодня', 'Погода завтра'))
     elif '/help'in message.text.lower():
-        bot.send_message(message.chat.id, info_message)
+        bot.send_message(message.chat.id, info_message, reply_markup=ReplyKeyboardRemove())
     elif message.text == '!' and message.from_user.id:
         bot.send_message(message.chat.id, 'Привет, Святослав')
         bot.send_message(message.chat.id, 'Твои инструменты:'
                                           '\nвыдай неопознанные'
                                           '\nочисти неопознанные'
-                                          '\nссылка на меня: http://t.me/svyat93_bot')
+                                          '\nссылка на меня: http://t.me/svyat93_bot',
+                                          reply_markup=ReplyKeyboardRemove())
     elif 'new_weather' in message.text and db.is_weather_place_set(message.from_user.id):
         result = db.get_place_info_of_user_by_user_id(message.from_user.id)
         bot.send_message(message.chat.id, 'Сейчас вы смотрите погоду здесь: \n'
@@ -89,9 +92,9 @@ def send_text(message):
         if not db.is_weather_place_set(message.from_user.id):  # Если неизвестно, где искать погоду, идем настраивать
             mow.weather_place_mode(message, db, bot)
         else:
-            bot.send_message(message.chat.id, mow.get_weather_info(db, message))
+            bot.send_message(message.chat.id, mow.get_weather_info(db, message), reply_markup=ReplyKeyboardRemove())
     elif 'оставлю как есть' in message.text.lower():
-        bot.send_message(message.chat.id, 'Хорошо, вы знаете где меня найти :)')
+        bot.send_message(message.chat.id, 'Хорошо, вы знаете где меня найти :)', reply_markup=ReplyKeyboardRemove())
     elif 'желаю изменить' in message.text.lower():
         db.set_place_id_to_user(None, message.from_user.id)
         mow.weather_place_mode(message, db, bot)
@@ -100,7 +103,7 @@ def send_text(message):
     elif ('очисти неопознанные' in message.text.lower()) and db.is_admin_id(message.from_user.id):
         bot.send_message(message.chat.id, db.delete_all_unknown_messages())
     elif cm.is_skill_question(message):
-        bot.send_message(message.chat.id, info_message)
+        bot.send_message(message.chat.id, info_message, reply_markup=ReplyKeyboardRemove())
     else:
         # Если есть ответ от бота - присылаем юзеру, если нет - бот его не понял
         response = cm.get_bot_answer(message)

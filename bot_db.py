@@ -432,6 +432,9 @@ class DBManager:
         else:
             last_let = city_name[-1]
 
+        if last_let == 'ы':
+            last_let = city_name[-3]
+
         # Получаем список оставшихся городов на эту букву
         self.cursor.execute(
             "select id, place_name from admin.places WHERE place_name ilike '{}%' "
@@ -506,8 +509,29 @@ class DBManager:
         else:
             last_let = city_name[-1]
 
+        if last_let == 'ы':
+            last_let = city_name[-3]
+
         if last_let == user_city[0].lower():
             self.set_new_city_in_game_table(user_id, city_id, user_city, False)
             return True
         else:
             return False
+
+    def is_user_already_win(self, user_id):
+        """Метод проверяет, не победил ли уже игрок
+        :param user_id - id пользователя
+        """
+
+        table_name = '{}{}'.format('admin.cities_', user_id)
+
+        self.cursor.execute("SELECT id from {} order by id desc limit 1".format(table_name))
+        result = self.cursor.fetchone()[0]
+        self.conn.commit()
+
+        if result > 50:
+            return True
+        else:
+            return False
+
+
