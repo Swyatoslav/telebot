@@ -9,7 +9,7 @@ from telebot.types import ReplyKeyboardRemove
 from bot_config import ConfigManager
 from bot_db import DBManager
 from bot_logging import LogManager
-from bot_skills import MasterOfWeather, CommunicationManager
+from bot_skills import MasterOfWeather, CommunicationManager, RandomManager
 from bot_consts import ConstantManager
 from bot_games import CitiesGameManager
 
@@ -39,10 +39,11 @@ db = DBManager(config.get('general', 'db'), config.get('general', 'db_user_name'
 cm = CommunicationManager()  # Общение с пользователем
 mow = MasterOfWeather()  # Работа с погодой
 cities_gm = CitiesGameManager()
+rm = RandomManager()
 
 
 @db.set_user_info
-@bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather', 'game_cities'])
+@bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather', 'game_cities', 'random_5'])
 @lm.log_message
 def start_message(message):
     if '/start' in message.text.lower():
@@ -72,6 +73,10 @@ def start_message(message):
                                             'Сделайте это с помощью команды /weather')
     elif 'game_cities' in message.text:
         cities_gm.game_mode(message, db, bot)
+    elif 'random_5' in message.text:
+        db.set_random_five_mode(message.from_user.id, True)
+        time.sleep(0.5)
+        bot.send_message(message.chat.id, 'Введите максимально возможное число диапазона')
 
 
 @bot.message_handler(content_types=['text'])
@@ -80,13 +85,25 @@ def start_message(message):
 def send_text(message):
     time.sleep(0.5)
 
+    # ========= ВКЛЮЧЕННЫЕ МОДЫ ===========
     # Настройка вывода погоды
-    if db.get_weather_edit_mode_stage(message.from_user.id):
+    if db.is_random_five_mode(message.from_user.id):
+        db.set_random_five_mode(message.from_user.id, None)
+        if message.text.isdigit():
+            result = rm.get_random_five(message.text)
+            bot.send_message(message.chat.id, '5 случайных чисел: {}, {}, {}, {}, {}'.format(*result))
+        else:
+            bot.send_message(message.chat.id, 'Ошибка: нужно положительное целое число для границы диапазона')
+
+    elif db.get_weather_edit_mode_stage(message.from_user.id):
         mow.weather_place_mode(message, db, bot)
     # Игра Города
     elif db.get_game_cities_mode_stage(message.from_user.id):
         cities_gm.game_mode(message, db, bot)
     # Вывод погоды
+
+    # ========= Общение ===========
+
     elif cm.is_weather_question(message.text):
         bot.send_message(message.chat.id, 'Секундочку')
         if not db.is_weather_place_set(message.from_user.id):  # Если неизвестно, где искать погоду, идем настраивать

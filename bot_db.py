@@ -534,4 +534,27 @@ class DBManager:
         else:
             return False
 
+    def set_random_five_mode(self, user_id, stage):
+        """Метод выставляет флаг начала random 5
+        :param user_id - id пользователя
+        :param stage - этап мода (True, None)
+        """
 
+        self.cursor.execute("""UPDATE admin.users
+	                           SET is_random_5=%s
+	                           WHERE id=%s;""", (stage, user_id))
+        self.conn.commit()
+
+    def is_random_five_mode(self, user_id):
+        """Метод проверяет, не выставлен ли режим random_5
+        :param user_id - id пользователя
+        """
+
+        self.cursor.execute("""SELECT is_random_5
+	                           FROM admin.users
+	                           WHERE id=%s;""", [user_id])
+        self.conn.commit()
+
+        result = self.cursor.fetchone()[0]
+
+        return result

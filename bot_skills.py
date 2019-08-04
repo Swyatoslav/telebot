@@ -8,6 +8,7 @@ from telebot import types
 from telebot.types import ReplyKeyboardRemove
 
 from bot_db import check_time
+from random import randint
 
 
 class MasterOfWeather:
@@ -306,3 +307,19 @@ class CommunicationManager:
                 return True
 
         return False
+
+
+class RandomManager:
+
+    def get_random_five(self, message):
+        """Метод выдает пять случайных чисел из диапазона"""
+
+        numbers = []
+
+        numbers.append(randint(1, int(message)))
+        while len(numbers) < 5:
+            random_number = randint(1, int(message))
+            if not random_number in numbers:
+                numbers.append(random_number)
+
+        return sorted(numbers)
