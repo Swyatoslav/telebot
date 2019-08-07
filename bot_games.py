@@ -1,6 +1,8 @@
 from bot_db import check_time
 from telebot import types
 from random import randint
+from telebot.types import ReplyKeyboardRemove
+import time
 
 
 class CitiesGameManager:
@@ -24,14 +26,15 @@ class CitiesGameManager:
     @check_time
     def game_mode(self, message, db, bot):
         """Режим игры в Города
-        :param message - сообщение пользователя
+        :param message - сообщение пользователяtime.sleep(0.5)
         :param db - экземпляр БД
         :param bot - экземпляр бота
         """
 
         if 'прервать' in message.text.lower() or 'прервем' in message.text.lower():
             db.set_game_cities_mode(message.from_user.id, None)
-            bot.send_message(message.chat.id, 'Хорошо, поиграем в другой раз!')
+            bot.send_message(message.chat.id, 'Хорошо, поиграем в другой раз!',
+                             reply_markup=ReplyKeyboardRemove())
             return
 
         phase = db.get_game_cities_mode_stage(message.from_user.id)
@@ -53,6 +56,7 @@ class CitiesGameManager:
 
         db.set_game_cities_mode(message.from_user.id, 'Вступление')
         if first_time:
+            time.sleep(0.5)
             bot.send_message(message.chat.id, 'Приветствую вас в игре Города!')
 
         info_msg1 = 'Правила очень простые:\n'\
@@ -60,10 +64,12 @@ class CitiesGameManager:
                     'например Орел. Ты мне говоришь город, \n'\
                     'начинающийся на последнюю букву моего города,\n'\
                     'например Липецк.\n'\
-                    'Продержишься 20 ходов - и ты победил :)'
+                    'Продержишься 25 ходов - и ты победил :)'
         info_msg2 = 'Начнем игру?'
 
+        time.sleep(0.5)
         bot.send_message(message.chat.id, info_msg1)
+        time.sleep(1)
         bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons('Начнем игру', 'Прервать игру'))
 
     def _first_game_cities_stage(self, message, db, bot):
@@ -76,7 +82,8 @@ class CitiesGameManager:
         if 'начнем' in message.text.lower():
             db.set_game_cities_mode(message.from_user.id, 'Игра')
             db.create_tmp_game_cities_table(message.from_user.id)
-            bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город')
+            bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город',
+                             reply_markup=self.set_buttons('Прервать игру'))
             return
 
         if 'продолжить' in message.text.lower():
@@ -99,8 +106,14 @@ class CitiesGameManager:
         if city_id:
             if not db.is_city_was_called(message.text, message.from_user.id):
                 if db.is_city_starts_with_end_letter(message.from_user.id, message.text, city_id):
-                    bot_city = db.select_random_city_against_user_city(message.from_user.id, message.text)
-                    bot.send_message(message.chat.id, bot_city, reply_markup=self.set_buttons('Прервать игру'))
+                    if db.is_user_already_win(message.from_user.id):
+                        bot.send_message(message.chat.id, 'Вы победили! Игра окончена :)',
+                                         reply_markup=ReplyKeyboardRemove())
+                        db.set_game_cities_mode(message.from_user.id, None)
+                        db.drop_tmp_table('admin.cities_{}'.format(message.from_user.id))
+                    else:
+                        bot_city = db.select_random_city_against_user_city(message.from_user.id, message.text)
+                        bot.send_message(message.chat.id, bot_city, reply_markup=self.set_buttons('Прервать игру'))
                 else:
                     bot.send_message(message.chat.id, 'Названный вами город начинается\n'
                                                       ' не с последней буквы предыдущего! ',

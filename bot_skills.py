@@ -5,8 +5,10 @@ import apiai
 import bs4
 import requests
 from telebot import types
+from telebot.types import ReplyKeyboardRemove
 
 from bot_db import check_time
+from random import randint
 
 
 class MasterOfWeather:
@@ -156,7 +158,7 @@ class MasterOfWeather:
         info_msg = 'Хорошо, настроим в другой раз :)'
 
         if self.btn1 in message.text or 'позже' in message.text:
-            bot.send_message(message.chat.id, info_msg)
+            bot.send_message(message.chat.id, info_msg, reply_markup=ReplyKeyboardRemove())
             db.set_weather_edit_mode(message.from_user.id, None)
             return
 
@@ -305,3 +307,19 @@ class CommunicationManager:
                 return True
 
         return False
+
+
+class RandomManager:
+
+    def get_random_five(self, message):
+        """Метод выдает пять случайных чисел из диапазона"""
+
+        numbers = []
+
+        numbers.append(randint(1, int(message)))
+        while len(numbers) < 5:
+            random_number = randint(1, int(message))
+            if not random_number in numbers:
+                numbers.append(random_number)
+
+        return sorted(numbers)
