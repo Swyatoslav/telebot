@@ -42,8 +42,8 @@ cities_gm = CitiesGameManager()
 rm = RandomManager()
 
 
-@db.set_user_info
 @bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather', 'game_cities', 'random_5'])
+@db.set_user_info
 @lm.log_message
 def start_message(message):
     if '/start' in message.text.lower():
@@ -88,13 +88,7 @@ def send_text(message):
     # ========= ВКЛЮЧЕННЫЕ МОДЫ ===========
     # Настройка вывода погоды
     if db.is_random_five_mode(message.from_user.id):
-        db.set_random_five_mode(message.from_user.id, None)
-        if message.text.isdigit():
-            result = rm.get_random_five(message.text)
-            bot.send_message(message.chat.id, '5 случайных чисел: {}, {}, {}, {}, {}'.format(*result))
-        else:
-            bot.send_message(message.chat.id, 'Ошибка: нужно положительное целое число для границы диапазона')
-
+        rm.random_five_mode(message, db, bot)
     elif db.get_weather_edit_mode_stage(message.from_user.id):
         mow.weather_place_mode(message, db, bot)
     # Игра Города

@@ -310,16 +310,31 @@ class CommunicationManager:
 
 
 class RandomManager:
+    """Менеджер по работе с модом random five"""
 
-    def get_random_five(self, message):
-        """Метод выдает пять случайных чисел из диапазона"""
+    def random_five_mode(self, message, db, bot):
+        """Мод random five - поиск и выдача 5 случайных чисел диапазона, в случае
+        если конечное значение диапазона передано корректно"""
 
-        numbers = []
+        db.set_random_five_mode(message.from_user.id, None)
 
-        numbers.append(randint(1, int(message)))
+        if message.text.isdigit():
+            result = self._get_random_five(message.text)
+            bot.send_message(message.chat.id, '5 случайных чисел: {}, {}, {}, {}, {}'.format(*result))
+        else:
+            bot.send_message(message.chat.id, 'Ошибка: нужно положительное целое число для границы диапазона')
+
+    def _get_random_five(self, end_range):
+        """Метод генерирует пять случайных чисел в диапазоне
+        :param end_range - граница диапазона
+        """
+
+        numbers = list()
+
+        numbers.append(randint(1, int(end_range)))
         while len(numbers) < 5:
-            random_number = randint(1, int(message))
-            if not random_number in numbers:
+            random_number = randint(1, int(end_range))
+            if random_number not in numbers:
                 numbers.append(random_number)
 
         return sorted(numbers)

@@ -558,3 +558,78 @@ class DBManager:
         result = self.cursor.fetchone()[0]
 
         return result
+
+    def set_all_game_cities(self, all_cities):
+        """Метод заполняет базу всеми городами мира
+        :param all_cities - список из множеств городов на разные буквы
+        """
+
+        for all_cities_letter in all_cities:
+            for city in all_cities_letter:
+                self.cursor.execute("SELECT id from admin.game_cities order by id desc limit 1")
+                result = self.cursor.fetchone()
+                self.conn.commit()
+                tmp_id = 1 if not result else result[0] + 1
+                self.cursor.execute("""INSERT INTO admin.game_cities(
+	                                    id, place_name)
+	                                    VALUES (%s, %s);""", (tmp_id, city))
+                self.conn.commit()
+
+    def update_all_cities(self):
+        """Метод вытаскивает все города россии из таблицы places"""
+
+        self.cursor.execute("""SELECT place_name from admin.places WHERE place_name NOT IN 
+        (SELECT place_name FROM admin.game_cities) AND is_city=TRUE
+        """)
+        self.conn.commit()
+
+        result = self.cursor.fetchall()
+        all_ru_cities = [city[0] for city in result]
+
+        for city in all_ru_cities:
+            self.cursor.execute("SELECT id from admin.game_cities order by id desc limit 1")
+            result = self.cursor.fetchone()
+            self.conn.commit()
+            tmp_id = 1 if not result else result[0] + 1
+            self.cursor.execute("""INSERT INTO admin.game_cities(
+        	                                    id, place_name)
+        	                                    VALUES (%s, %s);""", (tmp_id, city))
+            self.conn.commit()
+
+    def update_europe_cities(self, cities_list):
+        """Метод записывает города в таблицу городов европы
+        :param cities_list - список списков городов европы
+        """
+
+        for cities in cities_list:
+            for city in cities:
+                self.cursor.execute("SELECT id from admin.europe_cities order by id desc limit 1")
+                result = self.cursor.fetchone()
+                self.conn.commit()
+                tmp_id = 1 if not result else result[0] + 1
+                self.cursor.execute("""INSERT INTO admin.europe_cities(
+                        	                                    id, place_name)
+                        	                                    VALUES (%s, %s);""", (tmp_id, city))
+                self.conn.commit()
+
+    def update_all_cities_with_europe(self):
+        """Метод обновляет информацию по городам, добавляя города европы"""
+
+        self.cursor.execute("""SELECT place_name from admin.europe_cities WHERE place_name NOT IN 
+        (SELECT place_name FROM admin.game_cities)
+        """)
+
+        self.conn.commit()
+
+        result = self.cursor.fetchall()
+        all_ru_cities = [city[0] for city in result]
+
+        for city in all_ru_cities:
+            self.cursor.execute("SELECT id from admin.game_cities order by id desc limit 1")
+            result = self.cursor.fetchone()
+            self.conn.commit()
+            tmp_id = 1 if not result else result[0] + 1
+            self.cursor.execute("""INSERT INTO admin.game_cities(
+        	                                    id, place_name)
+        	                                    VALUES (%s, %s);""", (tmp_id, city))
+            self.conn.commit()
