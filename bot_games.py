@@ -42,7 +42,12 @@ class CitiesGameManager:
             time.sleep(0.5)
             bot.send_message(message.chat.id, 'Подождите, ищу информацию про {}..'.format(city))
             city_info = self.get_info_about_city(city)
-            bot.send_message(message.chat.id, city_info, reply_markup=ReplyKeyboardRemove())
+            if city_info:
+                bot.send_message(message.chat.id, city_info, reply_markup=ReplyKeyboardRemove())
+            else:
+                bot.send_message(message.chat.id, 'К сожалению, пока я не могу\n'
+                                                  ' ничего рассказать про{}'.format(city),
+                                 reply_markup=ReplyKeyboardRemove())
             time.sleep(2)
             bot.send_message(message.chat.id, 'Итак, мой город {}. Ваша очередь :)'.format(city),
                              reply_markup=self.set_buttons('Прервать игру'))
@@ -68,13 +73,13 @@ class CitiesGameManager:
         db.set_game_cities_mode(message.from_user.id, 'Вступление')
         if first_time:
             time.sleep(0.5)
-            bot.send_message(message.chat.id, 'Приветствую вас в игре Города России!')
+            bot.send_message(message.chat.id, 'Приветствую вас в игре Города!')
 
         info_msg1 = 'Правила очень простые:\n'\
-                    'Я называю один из городов России,\n'\
-                    'например Орел. Ты мне говоришь город, \n'\
+                    'Я называю один из городов,\n'\
+                    'например Рига. Ты мне говоришь город, \n'\
                     'начинающийся на последнюю букву моего города,\n'\
-                    'например Липецк.\n'\
+                    'например Анапа.\n'\
                     'Продержишься 25 ходов - и ты победил :)'
         info_msg2 = 'Начнем игру?'
 
@@ -101,7 +106,7 @@ class CitiesGameManager:
                                               '\nразрешенная буква.',
                              reply_markup=self.set_buttons('Прервать игру'))
             time.sleep(1)
-            bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой русский город.')
+            bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город.')
             return
 
         if 'продолжить' in message.text.lower():
@@ -152,7 +157,12 @@ class CitiesGameManager:
 
         search_str = '{} {}'.format(city, '(город)')
         wikipedia.set_lang('ru')
-        info = wikipedia.summary(search_str, sentences=5)
-        if '=' in info:
-            info = info[0:info.index('=')]
-        return info
+        try:
+            info = wikipedia.summary(search_str, sentences=5)
+            if '=' in info:
+                info = info[0:info.index('=')]
+            return info
+        except wikipedia.exceptions.PageError:
+            return False
+        except wikipedia.exceptions.DisambiguationError:
+            return False

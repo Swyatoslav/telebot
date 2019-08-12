@@ -68,9 +68,11 @@ class DBManager:
 
         def wrapper(message):
             if not self._is_uid_exists(message.from_user.id):
+                user_name = '{} {}'.format(message.from_user.first_name, message.from_user.last_name) \
+                    if message.from_user.last_name else message.from_user.first_name
                 self.cursor.execute('INSERT INTO admin.users(id, user_name, last_online) VALUES (%s, %s, %s);',
                                     (message.from_user.id,
-                                     message.from_user.first_name + ' ' + message.from_user.last_name,
+                                     user_name,
                                      cur_date))
             else:
                 self.cursor.execute('UPDATE admin.users	SET last_online=%s	WHERE id = %s',
@@ -437,8 +439,7 @@ class DBManager:
 
         # Получаем список оставшихся городов на эту букву
         self.cursor.execute(
-            "select id, place_name from admin.places WHERE place_name ilike '{}%' "
-            "AND is_city=True "
+            "select id, place_name from admin.game_cities WHERE place_name ilike '{}%' "
             "AND id NOT IN "
             "(select place_id from {})".format(last_let, table_name))
         self.conn.commit()
@@ -459,7 +460,7 @@ class DBManager:
         :param city - название города
         """
 
-        self.cursor.execute("SELECT id from admin.places where place_name ilike %s ", [city])
+        self.cursor.execute("SELECT id from admin.game_cities where place_name ilike %s ", [city])
         self.conn.commit()
         result = self.cursor.fetchone()
 
