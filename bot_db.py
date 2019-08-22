@@ -50,11 +50,70 @@ class DBManager:
         self.conn = psycopg2.connect(dbname=self.dbname, user=self.user, password=self.password, host=self.host,
                                      port='5432')
         self.cursor = self.conn.cursor()
+        self.conn.commit()
 
-    def get_admin_chat_id(self):
-        """Метод возвращает id админского чата"""
+    def save_report(self, uid, traceback, err_info):
+        """Метод записывает информацию по ошибке
+        :param uid - id пользователя
+        :param traceback - traceback ошибки
+        :param err_info - общая информация о пользователе и ошибке
+        """
 
-        self.cursor.execute("""SELECT id from admin.users WHERE """)
+        self.cursor.execute("SELECT id from admin.error_reports order by id desc limit 1")
+        result = self.cursor.fetchone()
+
+        # Проверяем id. Если база пустая, задаем id = 1 Для избежания ошибки при записи
+        report_id = 1 if result is None else int(result[0]) + 1
+
+        self.cursor.execute("""INSERT INTO admin.error_reports(
+	                            id, uid, traceback, err_info)
+	                            VALUES (%s, %s, %s, %s);""", (report_id, uid, traceback, err_info))
+        self.conn.commit()
+
+        return report_id
+
+    def get_report_info(self, report_id):
+        """Метод выводит отчет об ошибке
+        :param report_id - id отчета
+        """
+
+        self.cursor.execute("SELECT traceback, err_info from admin.error_reports WHERE id = {}".format(report_id))
+        self.conn.commit()
+        result = self.cursor.fetchone()
+
+        return result
+
+    def get_last_report_id(self):
+        """Метод возвращает id последнего номера отчета"""
+
+        self.cursor.execute("SELECT id from admin.error_reports order by id desc limit 1")
+        result = self.cursor.fetchone()
+        if result:
+            return result
+        else:
+            return False
+
+    def delete_report(self, report_id):
+        """Метод удаляет информацию об ошибке
+        :param report_id - id отчета
+        """
+
+        report = self.get_report_info(report_id)
+        if report:
+            self.cursor.execute("""DELETE FROM admin.error_reports WHERE id = {}""".format(report_id))
+            self.conn.commit()
+
+    def get_user_name(self, uid):
+        """Метод возвращает имя пользователя
+        :param uid - id пользователя
+        """
+
+        self.conn.commit()
+        self.cursor.execute("""SELECT user_name from admin.users WHERE id = {}""".format(uid))
+        self.conn.commit()
+        result = self.cursor.fetchone()
+
+        return result
 
     @check_time
     def _is_uid_exists(self, uid):
@@ -63,6 +122,7 @@ class DBManager:
         """
 
         self.cursor.execute('SELECT id from admin.users WHERE id = {}'.format(uid))
+        self.conn.commit()
         result = self.cursor.fetchone()
         if result is None:
             return False

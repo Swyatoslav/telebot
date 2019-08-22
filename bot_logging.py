@@ -2,8 +2,10 @@ import logging
 import sys
 from datetime import datetime
 import os
+import traceback
 
 import telebot
+from telebot.types import ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 
 
 class LogManager:
@@ -12,6 +14,19 @@ class LogManager:
     logger = telebot.logger
     formatter = logging.Formatter('[%(asctime)s] %(thread)d {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
                                   '%m-%d %H:%M:%S')
+
+    def gen_report_buttons(self, report_id, operation):
+        """Метод создает кнопку с вопросом о записи информации в бд"""
+
+        markup = InlineKeyboardMarkup()
+        markup.row_width = 1
+
+        if operation == 'savereport':
+            markup.add(InlineKeyboardButton("Показать отчет", callback_data='{}_{}'.format(operation, report_id)))
+        elif operation == 'delreport':
+            markup.add(InlineKeyboardButton("Удалить отчет", callback_data='{}_{}'.format(operation, report_id)))
+
+        return markup
 
     def start_logging(self):
         """Метод включает логироование"""
@@ -76,4 +91,51 @@ class LogManager:
                 log_file.write(102 * '=' + '\n')
             log_file.write('{}{}{}{}{}\n'.format(func_name_str, time_log, exec_time_str, user_id_str, user_msg))
 
+    def send_error_report(self, bot, db, message, err):
+        """Отсылает разработчику отчет об ошибке, полученной в результате действий пользователя
+        :param bot - экземпляр класса telebot
+        :param db - экземпляр БД
+        :param message - сообщение пользователя с полной информацией
+        :param err - текст ошибки
+        """
 
+        uid = message.from_user.id
+
+        bot.send_message(message.chat.id, 'Прошу прощения, в программе возникла ошибка.\n'
+                                          'Мой создатель обязательно с ней разберется.\n'
+                                          'До тех пор пожалуйста, не повторяйте действие,\n'
+                                          'приведшее к ошибке. Спасибо :)',
+                                          reply_markup=ReplyKeyboardRemove())
+        user_name = db.get_user_name(uid)[0]
+        err_report = 'MESSAGE: {}\nUSER_NAME: {}\nCHAT_ID: {}\n'.format(message.text, user_name, message.chat.id)
+
+        weather_place = db.is_weather_place_set(uid)
+        if weather_place:
+            err_report += 'WEATHER PLACE: {}\n'.format(weather_place)
+
+        # информация про random 5
+        if db.is_random_five_mode(uid):
+            db.set_random_five_mode(uid, None)
+            err_report += 'Random 5 mode: True\n'
+
+        # информация про мод настройки погоды
+        elif db.get_weather_edit_mode_stage(uid):
+            weather_stage = db.get_weather_edit_mode_stage(uid)
+            db.set_weather_edit_mode(uid, None)
+            err_report += 'Weather setup mode: True\nWeather setup stage: {}\n'.format(weather_stage)
+
+        # информация про игру Города
+        elif db.get_game_cities_mode_stage(uid):
+            game_cities_stage = db.get_game_cities_mode_stage(uid)
+            db.set_game_cities_mode(uid, None)
+            err_report += 'Game cities mode: True\nGame cities stage: {}\n'.format(game_cities_stage)
+
+        # Формирование stacktrace
+        err_stacktrace = ''.join(traceback.format_exception(etype=type(err), value=err, tb=err.__traceback__))
+        if len(err_stacktrace) > 3950:
+            err_stacktrace = '...{}'.format(err_stacktrace[-1:-3950])
+
+        report_id = db.save_report(uid, err_stacktrace, err_report)
+        bot.send_message('344950989', '*Пользователь {} получил ошибку\n\n*'.format(user_name),
+                         reply_markup=self.gen_report_buttons(report_id, 'savereport'),
+                         parse_mode='Markdown')
