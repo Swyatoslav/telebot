@@ -1,13 +1,14 @@
 """Модуль вспомогательных функций для обучения бота"""
 
-import requests
-from bot_db import DBManager
-from bot_config import ConfigManager
 import os
-import bs4
-import sys
 import re
+import sys
 
+import bs4
+import requests
+
+from bot_config import ConfigManager
+from bot_db import DBManager
 
 site = 'https://yandex.ru/pogoda/region/225?from=main_other_cities'
 
@@ -34,10 +35,10 @@ def _is_correct_href(href):
     """Метод проверяет, корректна ли ссылка"""
 
     if 'map' not in href and 'region' not in href and 'month' not in href \
-            and 'meteum' not in href and 'informer' not in href and 'details' not in href\
+            and 'meteum' not in href and 'informer' not in href and 'details' not in href \
             and 'compare' not in href:
-
         return href
+
 
 def parse_places_info(region_hrefs, region_names):
     """Метод парсит информацию о населенных пунктах"""
@@ -45,7 +46,6 @@ def parse_places_info(region_hrefs, region_names):
     short_site = 'https://yandex.ru'
     all_places_info = []
     for i in range(len(region_hrefs)):
-
         # Делаем запрос по ссылке
         response = requests.get(region_hrefs[i])
 
@@ -53,7 +53,7 @@ def parse_places_info(region_hrefs, region_names):
         bs = bs4.BeautifulSoup(response.text, "html.parser")
 
         # Парсим страницу запроса, результат идет в виде списка элементов класса Tag
-        parce_result= bs.find_all('a', href=re.compile('/pogoda/.*'))
+        parce_result = bs.find_all('a', href=re.compile('/pogoda/.*'))
 
         # Преобразуем список тэгов в список строк
         res = [str(line) for line in parce_result]
@@ -105,22 +105,74 @@ def parse_all_country_cities():
     return unique_city_names
 
 
-city_names = parse_all_country_cities()
-for city_name in city_names:
-    db.set_city_feature(city_name)
+def parse_all_cities():
+    """Метод парсит все города мира с сайта"""
+
+    first_site = 'http://www.1000mest.ru/cityA'
+    e = '.field-item tr'
+    e2 = 'nth-child'
+
+    response = requests.get(first_site)
+    bs = bs4.BeautifulSoup(response.text, "html.parser")
+
+    # Получаем список ссылок на буквы городов
+    parce_result = bs.select('h4 a')
+    all_letters = []
+    for i in parce_result:
+        start_index = str(i).index('"')
+        end_index = str(i).index('"', start_index + 1)
+        all_letters.append(str(i)[start_index + 1:end_index])
+
+    # Получаем названия городов на буквы
+    all_cities = []
+    for letter in all_letters:
+        site = 'http://www.1000mest.ru/{}'.format(letter)
+        response_new = requests.get(site)
+        bs = bs4.BeautifulSoup(response_new.text, "html.parser")
+        rows = len(bs.select(e))
+        cities = []
+        for i in range(1, rows):
+            cities.append(str(bs.select('{}:{}({})'.format(e, e2, i))[0].get_text()).replace('\n', ''))
+
+        all_cities.append(set(cities))
+
+    return all_cities
 
 
-unknown_cities = ['Касимов', 'Руза', 'Артёмовск', 'Микунь', 'Починок',
-                  'Сельцо', 'Дюртюли', 'Очёр', 'Лысьва', 'Котлас', 'Семилуки',
-                  'Заозёрный', 'Гусиноозёрск', 'Ельня', 'Курлово', 'Сычёвка',
-                  'Новохопёрск', 'Щёлково', 'Олёкминск', 'Березники',
-                  'Кораблино', 'Покров', 'Стародуб', 'Щёкино', 'Ликино-Дулёво',
-                  'Миллерово', 'Семёнов', 'Пикалёво', 'Циолковский', 'Бирюч',
-                  'Рассказово', 'Янаул', 'Пестово', 'Пугачёв', 'Верея',
-                  'Истра', 'Белоозёрский', 'Бобров', 'Гуково', 'Инсар',
-                  'Мезень', 'Тимашёвск', 'Кремёнки', 'Лиски', 'Красавино']
+def parse_europe_cities():
+    """Метод вытаскивает все города Европы"""
+
+    site = 'https://avtoturistu.ru/page/%D1%81%D0%BF%D0%B8%D1%81%D0%BE%D0%BA' \
+           '_%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%BE%D0%B2_%D0%95%D0%B2%D1%80%D0%BE%D0%BF%D1%8B/'
+
+    response = requests.get(site)
+    bs = bs4.BeautifulSoup(response.text, "html.parser")
+
+    # Записываем информацию про
+    cities_info = []
+    parse_result = bs.select('.content tr td:not([colspan="4"])')
+    for item in parse_result:
+        cities_info.append(item.get_text())
+
+    # Убираем лишние символы из городов
+    cities_info_cut_n = [city_row.replace('\n', ' ').replace('\r', ' ') for city_row in cities_info]
+    cities_info_cut_bracket = []
+    for city_block in cities_info_cut_n:
+        new_city_block = city_block
+        while '(' in new_city_block and ')' in new_city_block:
+            start_index = new_city_block.index('(')
+            end_index = new_city_block.index(')')
+            new_city_block = new_city_block.replace(new_city_block[start_index -1:end_index+1], '')
+
+        cities_info_cut_bracket.append(new_city_block)
+
+    cities_cut_tripple_whitespaces = [city_info.replace('   ', ' ') for city_info in cities_info_cut_bracket]
+    cities_cut_double_white_spaces = [city_info.replace('  ', ' ') for city_info in cities_cut_tripple_whitespaces]
+    cities = [city.split(' ') for city in cities_cut_double_white_spaces]
+
+    return cities
 
 
-# region_hrefs, region_names = parse_regions_info()
-# all_places_info = parse_places_info(region_hrefs, region_names)
-# db.set_places_info(all_places_info)
+# cities_list = parse_europe_cities()
+# db.update_europe_cities(cities_list)
+# db.update_all_cities_with_europe()

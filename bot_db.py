@@ -50,11 +50,92 @@ class DBManager:
         self.conn = psycopg2.connect(dbname=self.dbname, user=self.user, password=self.password, host=self.host,
                                      port='5432')
         self.cursor = self.conn.cursor()
+        self.conn.commit()
+
+    def save_report(self, uid, traceback, err_info):
+        """Метод записывает информацию по ошибке
+        :param uid - id пользователя
+        :param traceback - traceback ошибки
+        :param err_info - общая информация о пользователе и ошибке
+        """
+
+        self.cursor.execute("SELECT id from admin.error_reports order by id desc limit 1")
+        result = self.cursor.fetchone()
+
+        # Проверяем id. Если база пустая, задаем id = 1 Для избежания ошибки при записи
+        report_id = 1 if result is None else int(result[0]) + 1
+
+        self.cursor.execute("""INSERT INTO admin.error_reports(
+	                            id, uid, traceback, err_info)
+	                            VALUES (%s, %s, %s, %s);""", (report_id, uid, traceback, err_info))
+        self.conn.commit()
+
+        return report_id
+
+    def get_report_info(self, report_id):
+        """Метод выводит отчет об ошибке
+        :param report_id - id отчета
+        """
+
+        self.cursor.execute("SELECT traceback, err_info from admin.error_reports WHERE id = {}".format(report_id))
+        self.conn.commit()
+        result = self.cursor.fetchone()
+
+        return result
+
+    def get_last_report_id(self):
+        """Метод возвращает id последнего номера отчета"""
+
+        self.cursor.execute("SELECT id from admin.error_reports order by id desc limit 1")
+        result = self.cursor.fetchone()
+        if result:
+            return result
+        else:
+            return False
+
+    def delete_report(self, report_id):
+        """Метод удаляет информацию об ошибке
+        :param report_id - id отчета
+        """
+
+        report = self.get_report_info(report_id)
+        if report:
+            self.cursor.execute("""DELETE FROM admin.error_reports WHERE id = {}""".format(report_id))
+            self.conn.commit()
+
+    def get_user_name(self, uid):
+        """Метод возвращает имя пользователя
+        :param uid - id пользователя
+        """
+
+        self.conn.commit()
+        self.cursor.execute("""SELECT user_name from admin.users WHERE id = {}""".format(uid))
+        self.conn.commit()
+        result = self.cursor.fetchone()
+
+        return result
 
     @check_time
     def _is_uid_exists(self, uid):
+        """Метод проверяет, есть ли такой uid в базе
+        :param uid - id пользователя
+        """
+
         self.cursor.execute('SELECT id from admin.users WHERE id = {}'.format(uid))
+        self.conn.commit()
         result = self.cursor.fetchone()
+        if result is None:
+            return False
+
+        return True
+
+    def _is_chat_id_exists(self, uid):
+        """Метод проверяет, есть ли у юзера id чата
+        :param uid - id юзера
+        """
+
+        self.cursor.execute('SELECT chat_id from admin.users WHERE id = {}'.format(uid))
+        result = self.cursor.fetchone()[0]
         if result is None:
             return False
 
@@ -68,10 +149,16 @@ class DBManager:
 
         def wrapper(message):
             if not self._is_uid_exists(message.from_user.id):
+                user_name = '{} {}'.format(message.from_user.first_name, message.from_user.last_name) \
+                    if message.from_user.last_name else message.from_user.first_name
                 self.cursor.execute('INSERT INTO admin.users(id, user_name, last_online) VALUES (%s, %s, %s);',
                                     (message.from_user.id,
-                                     message.from_user.first_name + ' ' + message.from_user.last_name,
+                                     user_name,
                                      cur_date))
+            elif not self._is_chat_id_exists(message.from_user.id):
+                self.cursor.execute("""UPDATE admin.users SET chat_id=%s WHERE id=%s""",
+                                    (message.chat.id, message.from_user.id))
+
             else:
                 self.cursor.execute('UPDATE admin.users	SET last_online=%s	WHERE id = %s',
                                     (cur_date, message.from_user.id))
@@ -427,18 +514,17 @@ class DBManager:
 
         table_name = '{}{}'.format('admin.cities_', user_id)
 
-        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы']:
+        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы', 'ё']:
             last_let = city_name[-2]
         else:
             last_let = city_name[-1]
 
-        if last_let == 'ы':
+        if last_let in ['ь', 'ъ', 'й', 'ю', 'ы', 'ё']:
             last_let = city_name[-3]
 
         # Получаем список оставшихся городов на эту букву
         self.cursor.execute(
-            "select id, place_name from admin.places WHERE place_name ilike '{}%' "
-            "AND is_city=True "
+            "select id, place_name from admin.game_cities WHERE place_name ilike '{}%' "
             "AND id NOT IN "
             "(select place_id from {})".format(last_let, table_name))
         self.conn.commit()
@@ -459,7 +545,7 @@ class DBManager:
         :param city - название города
         """
 
-        self.cursor.execute("SELECT id from admin.places where place_name ilike %s ", [city])
+        self.cursor.execute("SELECT id from admin.game_cities where place_name ilike %s ", [city])
         self.conn.commit()
         result = self.cursor.fetchone()
 
@@ -558,3 +644,78 @@ class DBManager:
         result = self.cursor.fetchone()[0]
 
         return result
+
+    def set_all_game_cities(self, all_cities):
+        """Метод заполняет базу всеми городами мира
+        :param all_cities - список из множеств городов на разные буквы
+        """
+
+        for all_cities_letter in all_cities:
+            for city in all_cities_letter:
+                self.cursor.execute("SELECT id from admin.game_cities order by id desc limit 1")
+                result = self.cursor.fetchone()
+                self.conn.commit()
+                tmp_id = 1 if not result else result[0] + 1
+                self.cursor.execute("""INSERT INTO admin.game_cities(
+	                                    id, place_name)
+	                                    VALUES (%s, %s);""", (tmp_id, city))
+                self.conn.commit()
+
+    def update_all_cities(self):
+        """Метод вытаскивает все города россии из таблицы places"""
+
+        self.cursor.execute("""SELECT place_name from admin.places WHERE place_name NOT IN 
+        (SELECT place_name FROM admin.game_cities) AND is_city=TRUE
+        """)
+        self.conn.commit()
+
+        result = self.cursor.fetchall()
+        all_ru_cities = [city[0] for city in result]
+
+        for city in all_ru_cities:
+            self.cursor.execute("SELECT id from admin.game_cities order by id desc limit 1")
+            result = self.cursor.fetchone()
+            self.conn.commit()
+            tmp_id = 1 if not result else result[0] + 1
+            self.cursor.execute("""INSERT INTO admin.game_cities(
+        	                                    id, place_name)
+        	                                    VALUES (%s, %s);""", (tmp_id, city))
+            self.conn.commit()
+
+    def update_europe_cities(self, cities_list):
+        """Метод записывает города в таблицу городов европы
+        :param cities_list - список списков городов европы
+        """
+
+        for cities in cities_list:
+            for city in cities:
+                self.cursor.execute("SELECT id from admin.europe_cities order by id desc limit 1")
+                result = self.cursor.fetchone()
+                self.conn.commit()
+                tmp_id = 1 if not result else result[0] + 1
+                self.cursor.execute("""INSERT INTO admin.europe_cities(
+                        	                                    id, place_name)
+                        	                                    VALUES (%s, %s);""", (tmp_id, city))
+                self.conn.commit()
+
+    def update_all_cities_with_europe(self):
+        """Метод обновляет информацию по городам, добавляя города европы"""
+
+        self.cursor.execute("""SELECT place_name from admin.europe_cities WHERE place_name NOT IN 
+        (SELECT place_name FROM admin.game_cities)
+        """)
+
+        self.conn.commit()
+
+        result = self.cursor.fetchall()
+        all_ru_cities = [city[0] for city in result]
+
+        for city in all_ru_cities:
+            self.cursor.execute("SELECT id from admin.game_cities order by id desc limit 1")
+            result = self.cursor.fetchone()
+            self.conn.commit()
+            tmp_id = 1 if not result else result[0] + 1
+            self.cursor.execute("""INSERT INTO admin.game_cities(
+        	                                    id, place_name)
+        	                                    VALUES (%s, %s);""", (tmp_id, city))
+            self.conn.commit()

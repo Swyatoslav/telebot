@@ -3,6 +3,7 @@ from telebot import types
 from random import randint
 from telebot.types import ReplyKeyboardRemove
 import time
+import wikipedia
 
 
 class CitiesGameManager:
@@ -36,6 +37,21 @@ class CitiesGameManager:
             bot.send_message(message.chat.id, 'Хорошо, поиграем в другой раз!',
                              reply_markup=ReplyKeyboardRemove())
             return
+        elif 'Узнать про' in message.text:
+            city = message.text.split('Узнать про')[1]
+            time.sleep(0.5)
+            bot.send_message(message.chat.id, 'Подождите, ищу информацию про {}..'.format(city))
+            city_info = self.get_info_about_city(city)
+            if city_info:
+                bot.send_message(message.chat.id, city_info, reply_markup=ReplyKeyboardRemove())
+            else:
+                bot.send_message(message.chat.id, 'К сожалению, пока я не могу\n'
+                                                  ' ничего рассказать про{}'.format(city),
+                                 reply_markup=ReplyKeyboardRemove())
+            time.sleep(2)
+            bot.send_message(message.chat.id, 'Итак, мой город {}. Ваша очередь :)'.format(city),
+                             reply_markup=self.set_buttons('Прервать игру'))
+            return
 
         phase = db.get_game_cities_mode_stage(message.from_user.id)
 
@@ -60,10 +76,10 @@ class CitiesGameManager:
             bot.send_message(message.chat.id, 'Приветствую вас в игре Города!')
 
         info_msg1 = 'Правила очень простые:\n'\
-                    'Я называю один из городов России,\n'\
-                    'например Орел. Ты мне говоришь город, \n'\
+                    'Я называю один из городов,\n'\
+                    'например Рига. Ты мне говоришь город, \n'\
                     'начинающийся на последнюю букву моего города,\n'\
-                    'например Липецк.\n'\
+                    'например Анапа.\n'\
                     'Продержишься 25 ходов - и ты победил :)'
         info_msg2 = 'Начнем игру?'
 
@@ -82,8 +98,15 @@ class CitiesGameManager:
         if 'начнем' in message.text.lower():
             db.set_game_cities_mode(message.from_user.id, 'Игра')
             db.create_tmp_game_cities_table(message.from_user.id)
-            bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город',
+            bot.send_message(message.chat.id, 'Обратите внимание, буквы'
+                                              '\n-ы-, -й-, -ь-, -ъ-'
+                                              '\nне участвуют в игре.'
+                                              '\nЕсли город оканчивается'
+                                              '\nна эти буквы, берется последняя'
+                                              '\nразрешенная буква.',
                              reply_markup=self.set_buttons('Прервать игру'))
+            time.sleep(1)
+            bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город.')
             return
 
         if 'продолжить' in message.text.lower():
@@ -113,7 +136,8 @@ class CitiesGameManager:
                         db.drop_tmp_table('admin.cities_{}'.format(message.from_user.id))
                     else:
                         bot_city = db.select_random_city_against_user_city(message.from_user.id, message.text)
-                        bot.send_message(message.chat.id, bot_city, reply_markup=self.set_buttons('Прервать игру'))
+                        bot.send_message(message.chat.id, bot_city,
+                                         reply_markup=self.set_buttons('Прервать игру', 'Узнать про {}'.format(bot_city)))
                 else:
                     bot.send_message(message.chat.id, 'Названный вами город начинается\n'
                                                       ' не с последней буквы предыдущего! ',
@@ -125,11 +149,20 @@ class CitiesGameManager:
             bot.send_message(message.chat.id, 'Извините, я не знаю такого города. Введите другой',
                              reply_markup=self.set_buttons('Прервать игру'))
 
+    @check_time
+    def get_info_about_city(self, city):
+        """Метод парсит википедию в поисках  города
+        :param city - название города
+        """
 
-
-
-
-
-
-
-
+        search_str = '{} {}'.format(city, '(город)')
+        wikipedia.set_lang('ru')
+        try:
+            info = wikipedia.summary(search_str, sentences=5)
+            if '=' in info:
+                info = info[0:info.index('=')]
+            return info
+        except wikipedia.exceptions.PageError:
+            return False
+        except wikipedia.exceptions.DisambiguationError:
+            return False
