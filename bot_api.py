@@ -79,22 +79,22 @@ def start_message(message):
         bot.send_message(message.chat.id, 'Введите максимально возможное число диапазона')
 
 
-@bot.message_handler(content_types=['text'])
+@bot.message_handler()
 @lm.log_message
 @db.set_user_info
 def send_text(message):
     time.sleep(0.5)
 
     # ========= ВКЛЮЧЕННЫЕ МОДЫ ===========
-    # Настройка вывода погоды
+    # random_five
     if db.is_random_five_mode(message.from_user.id):
         rm.random_five_mode(message, db, bot)
+    # Настройка вывода погоды
     elif db.get_weather_edit_mode_stage(message.from_user.id):
         mow.weather_place_mode(message, db, bot)
     # Игра Города
     elif db.get_game_cities_mode_stage(message.from_user.id):
         cities_gm.game_mode(message, db, bot)
-    # Вывод погоды
 
     # ========= Общение ===========
 

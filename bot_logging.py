@@ -36,6 +36,7 @@ class LogManager:
 
             print('{0}  USER: [{1} {2}]  USER_ID: [{3}]  MESSAGE: [{4}]'.format(
                 time_log, user_info[0], user_info[1], user_info[2], message.text))
+
             func(message)
 
         return wrapper

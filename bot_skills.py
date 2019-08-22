@@ -81,6 +81,7 @@ class MasterOfWeather:
             return
 
         result = db.get_place_info_by_name(message.text)
+
         if not result:  # результаты поиска отсутствуют
             bot.send_message(message.chat.id, info_msg1, reply_markup=self.set_buttons(self.btn1))
         elif len(result) > 1:  # найдено несколько результатов
@@ -93,11 +94,27 @@ class MasterOfWeather:
             # формируем сообщение с вариантами выбора из найденных результатов поиска
             result_msg = ''
             for res_line in result_list:
-                result_msg += '{}. {}, {}\n'.format(res_line[0], res_line[3], res_line[2])
-            bot.send_message(message.chat.id, result_msg)
+
+                # Случай, когда найдено слишком много совпадений
+                if int(res_line[0]) > 200:
+                    db.set_weather_edit_mode(message.from_user.id, self.second_phase)
+                    bot.send_message(message.chat.id, 'Найдено более 200 совпадений, уточните поиск.'
+                                                      '\nВведите ещё раз название населенного пункта')
+                    return
+                else:
+                    result_msg += '{}. {}, {}\n'.format(res_line[0], res_line[3], res_line[2])
+
+            # Если сообщение вышло слишком длинное, дробим его на несколько
+            if len(result_msg) > 4096:
+                for x in range(0, len(result_msg), 4096):
+                    bot.send_message(message.chat.id, result_msg[x:x + 4096])
+            else:
+                bot.send_message(message.chat.id, result_msg)
+
         else:
             bot.send_message(message.chat.id, '{} ({}), верно?'.format(result[0][2], result[0][1]),
                              reply_markup=self.set_buttons('Верно', 'Неверно'))
+            
             # Запись результатов поиска во временную бд
             tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)
             db.set_tmp_result_of_search_weather_place(tmp_table, result)

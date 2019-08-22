@@ -51,10 +51,31 @@ class DBManager:
                                      port='5432')
         self.cursor = self.conn.cursor()
 
+    def get_admin_chat_id(self):
+        """Метод возвращает id админского чата"""
+
+        self.cursor.execute("""SELECT id from admin.users WHERE """)
+
     @check_time
     def _is_uid_exists(self, uid):
+        """Метод проверяет, есть ли такой uid в базе
+        :param uid - id пользователя
+        """
+
         self.cursor.execute('SELECT id from admin.users WHERE id = {}'.format(uid))
         result = self.cursor.fetchone()
+        if result is None:
+            return False
+
+        return True
+
+    def _is_chat_id_exists(self, uid):
+        """Метод проверяет, есть ли у юзера id чата
+        :param uid - id юзера
+        """
+
+        self.cursor.execute('SELECT chat_id from admin.users WHERE id = {}'.format(uid))
+        result = self.cursor.fetchone()[0]
         if result is None:
             return False
 
@@ -74,6 +95,10 @@ class DBManager:
                                     (message.from_user.id,
                                      user_name,
                                      cur_date))
+            elif not self._is_chat_id_exists(message.from_user.id):
+                self.cursor.execute("""UPDATE admin.users SET chat_id=%s WHERE id=%s""",
+                                    (message.chat.id, message.from_user.id))
+
             else:
                 self.cursor.execute('UPDATE admin.users	SET last_online=%s	WHERE id = %s',
                                     (cur_date, message.from_user.id))
@@ -429,12 +454,12 @@ class DBManager:
 
         table_name = '{}{}'.format('admin.cities_', user_id)
 
-        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы']:
+        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы', 'ё']:
             last_let = city_name[-2]
         else:
             last_let = city_name[-1]
 
-        if last_let == 'ы':
+        if last_let in ['ь', 'ъ', 'й', 'ю', 'ы', 'ё']:
             last_let = city_name[-3]
 
         # Получаем список оставшихся городов на эту букву
