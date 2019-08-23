@@ -719,3 +719,31 @@ class DBManager:
         	                                    id, place_name)
         	                                    VALUES (%s, %s);""", (tmp_id, city))
             self.conn.commit()
+
+    def set_new_cities(self, new_list):
+        """Обновление списка для игры Города
+        :param new_list - новые города
+        """
+
+        for city in new_list:
+            self.cursor.execute("SELECT id from admin.game_cities order by id desc limit 1")
+            result = self.cursor.fetchone()
+            self.conn.commit()
+            tmp_id = 1 if not result else result[0] + 1
+            self.cursor.execute("""INSERT INTO admin.game_cities(id, place_name) VALUES (%s, %s)
+	                                                ON CONFLICT DO NOTHING;""", (tmp_id, city))
+            self.conn.commit()
+
+    def get_all_problem_cities(self):
+        """Метод вытаскивает все проблемные города из городов"""
+
+        self.cursor.execute("""SELECT id, place_name from admin.game_cities
+                                    WHERE place_name ilike '%ё%' or place_name like '%-%'""")
+
+        self.conn.commit()
+        result = self.cursor.fetchall()
+
+        return result
+
+    def set_all_problem_cities(self, problem_list):
+        """Метод записывает в таблицу game_cites_dif все проблемные города"""

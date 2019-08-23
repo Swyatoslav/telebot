@@ -95,16 +95,25 @@ class CitiesGameManager:
         :param bot - экземпляр бота
         """
 
+        rules = """ Обратите внимание, буквы
+*-ы-, -й-, -ь-, -ъ-* не участвуют в игре.
+Если город оканчивается на эти буквы, берется последняя разрешенная буква.
+Если город оканчивается на *-ый-*, берется буква перед *-ы-*.
+"""
+
         if 'начнем' in message.text.lower():
             db.set_game_cities_mode(message.from_user.id, 'Игра')
             db.create_tmp_game_cities_table(message.from_user.id)
-            bot.send_message(message.chat.id, 'Обратите внимание, буквы'
-                                              '\n-ы-, -й-, -ь-, -ъ-'
-                                              '\nне участвуют в игре.'
-                                              '\nЕсли город оканчивается'
-                                              '\nна эти буквы, берется последняя'
-                                              '\nразрешенная буква.',
-                             reply_markup=self.set_buttons('Прервать игру'))
+            # bot.send_message(message.chat.id, 'Обратите внимание, буквы'
+            #                                   '\n-ы-, -й-, -ь-, -ъ-'
+            #                                   '\nне участвуют в игре.'
+            #                                   '\nЕсли город оканчивается'
+            #                                   '\nна эти буквы, берется последняя'
+            #                                   '\nразрешенная буква.',
+            #                  reply_markup=self.set_buttons('Прервать игру'))
+            bot.send_message(message.chat.id, rules,
+                             reply_markup=self.set_buttons('Прервать игру'),
+                             parse_mode='Markdown')
             time.sleep(1)
             bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город.')
             return

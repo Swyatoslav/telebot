@@ -172,7 +172,28 @@ def parse_europe_cities():
 
     return cities
 
+def get_usa_cities_list():
+    """Метод выдирает все города с сайта"""
 
-# cities_list = parse_europe_cities()
-# db.update_europe_cities(cities_list)
-# db.update_all_cities_with_europe()
+    site = 'http://www.americancities.ru/info/usa_cities_in_alphabetical/'
+
+    # Делаем запрос на сайт
+    response = requests.get(site)
+    bs = bs4.BeautifulSoup(response.text, "html.parser")
+    result = bs.select('.stat tr>td:nth-child(1)')
+
+    return [str(city)[4:-5] for city in result]
+
+
+def get_problem_cities():
+    """Метод вытаскивает все проблемные города из городов, и делает их навание доступным
+    после чего обрабатывает их
+    """
+
+    result = db.get_all_problem_cities()
+    result_collection = [(place_id, place_name, place_name.replace('ё', 'е').replace('-', ' '))
+                         for place_id, place_name in result]
+
+    print(result_collection)
+
+result_collection = get_problem_cities()

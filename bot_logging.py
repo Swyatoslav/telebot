@@ -3,7 +3,7 @@ import sys
 from datetime import datetime
 import os
 import traceback
-
+import time
 import telebot
 from telebot.types import ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -21,10 +21,8 @@ class LogManager:
         markup = InlineKeyboardMarkup()
         markup.row_width = 1
 
-        if operation == 'savereport':
-            markup.add(InlineKeyboardButton("Показать отчет", callback_data='{}_{}'.format(operation, report_id)))
-        elif operation == 'delreport':
-            markup.add(InlineKeyboardButton("Удалить отчет", callback_data='{}_{}'.format(operation, report_id)))
+        oper_txt = 'Показать' if operation == 'savereport' else 'Удалить'
+        markup.add(InlineKeyboardButton(oper_txt + " отчет", callback_data='{}_{}'.format(operation, report_id)))
 
         return markup
 
@@ -117,24 +115,34 @@ class LogManager:
         if db.is_random_five_mode(uid):
             db.set_random_five_mode(uid, None)
             err_report += 'Random 5 mode: True\n'
+            time.sleep(0.5)
+            bot.send_message(message.chat.id, '*Аварийный выход из мода Random 5*', reply_markup=ReplyKeyboardRemove(),
+                             parse_mode='Markdown')
 
         # информация про мод настройки погоды
         elif db.get_weather_edit_mode_stage(uid):
             weather_stage = db.get_weather_edit_mode_stage(uid)
             db.set_weather_edit_mode(uid, None)
             err_report += 'Weather setup mode: True\nWeather setup stage: {}\n'.format(weather_stage)
+            time.sleep(0.5)
+            bot.send_message(message.chat.id, '*Аварийный выход из настройки погоды*', reply_markup=ReplyKeyboardRemove(),
+                             parse_mode='Markdown')
 
         # информация про игру Города
         elif db.get_game_cities_mode_stage(uid):
             game_cities_stage = db.get_game_cities_mode_stage(uid)
             db.set_game_cities_mode(uid, None)
             err_report += 'Game cities mode: True\nGame cities stage: {}\n'.format(game_cities_stage)
+            time.sleep(0.5)
+            bot.send_message(message.chat.id, '*Аварийный выход из игры "Города мира"*', reply_markup=ReplyKeyboardRemove(),
+                             parse_mode='Markdown')
 
         # Формирование stacktrace
         err_stacktrace = ''.join(traceback.format_exception(etype=type(err), value=err, tb=err.__traceback__))
         if len(err_stacktrace) > 3950:
             err_stacktrace = '...{}'.format(err_stacktrace[-1:-3950])
 
+        # Отправка сообщения об ошибке в чат админа
         report_id = db.save_report(uid, err_stacktrace, err_report)
         bot.send_message('344950989', '*Пользователь {} получил ошибку\n\n*'.format(user_name),
                          reply_markup=self.gen_report_buttons(report_id, 'savereport'),
