@@ -9,6 +9,8 @@ import requests
 
 from bot_config import ConfigManager
 from bot_db import DBManager
+import wikipedia
+from itertools import groupby
 
 site = 'https://yandex.ru/pogoda/region/225?from=main_other_cities'
 
@@ -172,7 +174,77 @@ def parse_europe_cities():
 
     return cities
 
+def get_usa_cities_list():
+    """Метод выдирает все города с сайта"""
 
-# cities_list = parse_europe_cities()
-# db.update_europe_cities(cities_list)
-# db.update_all_cities_with_europe()
+    site = 'http://www.americancities.ru/info/usa_cities_in_alphabetical/'
+
+    # Делаем запрос на сайт
+    response = requests.get(site)
+    bs = bs4.BeautifulSoup(response.text, "html.parser")
+    result = bs.select('.stat tr>td:nth-child(1)')
+
+    return [str(city)[4:-5] for city in result]
+
+
+def get_problem_cities():
+    """Метод вытаскивает все проблемные города из городов, и делает их навание доступным
+    после чего обрабатывает их
+    """
+
+    result = db.get_all_problem_cities()
+    result_collection = [(place_id, place_name, place_name.replace('ё', 'е').replace('-', ' '))
+                         for place_id, place_name in result]
+
+    return result_collection
+
+def get_problem_capitals():
+    """Метод вытаскивает все проблемные столицы для игры -Столицы Мира-, и делает их навание доступным
+    после чего обрабатывает их
+    """
+
+    result = db.get_all_problem_capitals()
+    result_collection = [(capital_id, capital_name, capital_name.replace('ё', 'е').replace('-', ' '))
+                         for capital_id, capital_name in result]
+
+    return result_collection
+
+def parse_all_countries_with_capitals():
+    """Метод парсит википедию и получает список столиц со странами"""
+
+    site = 'https://ru.wikipedia.org/wiki/%D0%A1%D0%BF%D0%B8%D1%81%D0%BE%D0%BA_%D1%81%D1%82%D0%BE%D0%BB%D0%B8%D1%86_%D0%BC%D0%B8%D1%80%D0%B0'
+
+    response = requests.get(site)
+    bs = bs4.BeautifulSoup(response.text, "html.parser")
+    elms = bs.find_all('a', title=re.compile('[а-яА-ЯёЁ\s()-]*'))
+    row_list = [line.get('title') for line in elms if
+                ':' not in line.get('title')
+                and line.get('title') not in
+                ['Европа', 'Азия', 'Африка', 'Америка' 'Австралия и Океания']]
+    # country_list = [elm for elm in row_list if ' ' not in elm or ':' not in elm]
+    country_list_without_doubles = [el for el, _ in groupby(row_list) if el != 'Ватикан'][:420]
+    country_list_corr = [elm.replace(' (город)', '').replace(' (Сейшельские острова)', '').replace(' (округ Колумбия)', '').replace(' (Ямайка)', '').replace(' (Багамы)', '').replace(' (Коста-Рика)', '')
+                         for elm in country_list_without_doubles if
+                         'Поиск' not in elm and
+                         'Перейти' not in elm and
+                         'Статьи' not in elm and
+                         'Части' not in elm and
+                         'раздел' not in elm and
+                         'Флаг' not in elm and
+                         'Редактировать' not in elm and
+                         'Нью-Дели' not in elm and
+                         'Баирики' not in elm and
+                         'Сингапур' not in elm and
+                         'Америка' not in elm and
+                         'Австралия и Океания' not in elm
+                        ]
+    country_list_corr.extend(['Ватикан', 'Ватикан', 'Сингапур', 'Сингапур'])
+    countries_list = [country_list_corr[i] for i in range(len(country_list_corr)) if i % 2 == 1]
+    capitals_list = [country_list_corr[i] for i in range(len(country_list_corr)) if i % 2 == 0]
+    result = [(countries_list[i], capitals_list[i]) for i in range(len(countries_list))]
+
+    return result
+
+
+problem_list = get_problem_capitals()
+db.set_all_problem_capitals(problem_list)
