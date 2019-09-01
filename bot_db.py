@@ -457,11 +457,30 @@ class DBManager:
         self.cursor.execute("UPDATE admin.users	SET game_cities=%s WHERE id=%s;", (stage, user_id))
         self.conn.commit()
 
+    def set_game_capitals_mode(self, user_id, stage):
+        """Метод записывает в БД название этапа игры (Вступление/Игра)
+        :param user_id - id пользователя
+        :param stage - название этапа
+        """
+
+        self.cursor.execute("UPDATE admin.users	SET game_capitals=%s WHERE id=%s;", (stage, user_id))
+        self.conn.commit()
+
     @check_time
     def get_game_cities_mode_stage(self, user_id):
         """Проверяем, не идет ли игра Города у пользователя"""
 
         self.cursor.execute('SELECT game_cities FROM admin.users where id=%s', [user_id])
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result[0]
+
+    @check_time
+    def get_game_capitals_mode_stage(self, user_id):
+        """Проверяем, не идет ли игра Столицы мира у пользователя"""
+
+        self.cursor.execute('SELECT game_capitals FROM admin.users where id=%s', [user_id])
         result = self.cursor.fetchone()
         self.conn.commit()
 
@@ -473,7 +492,7 @@ class DBManager:
         """
 
         part_table_name = '{}{}'.format('cities_', user_id)
-        full_table_name = 'admin.{}'.format(part_table_name)
+        full_table_name = 'game_cities.{}'.format(part_table_name)
 
         self.cursor.execute(""" DROP TABLE IF EXISTS {1};
                                 CREATE TABLE {1}(
@@ -481,6 +500,24 @@ class DBManager:
                                 place_id integer NOT NULL,
                                 city_name text NOT NULL,
                                 is_bot boolean NOT NULL,
+                                CONSTRAINT {0}_pkey PRIMARY KEY (id));""".format(part_table_name, full_table_name))
+        self.conn.commit()
+
+        return full_table_name
+
+    def create_tmp_game_capitals_table(self, user_id):
+        """Метод создает игровую таблицу для игры Столицы
+        :param user_id - id пользователя
+        """
+
+        part_table_name = '{}{}'.format('capitals_', user_id)
+        full_table_name = 'game_capitals.{}'.format(part_table_name)
+
+        self.cursor.execute(""" DROP TABLE IF EXISTS {1};
+                                CREATE TABLE {1}(
+                                id integer NOT NULL,
+                                country_id integer NOT NULL,
+                                call_capital boolean,
                                 CONSTRAINT {0}_pkey PRIMARY KEY (id));""".format(part_table_name, full_table_name))
         self.conn.commit()
 
@@ -494,7 +531,7 @@ class DBManager:
         :param is_bot - город назвал бот
         """
 
-        table_name = '{}{}'.format('admin.cities_', user_id)
+        table_name = '{}{}'.format('game_cities.cities_', user_id)
 
         self.cursor.execute("SELECT id from {} order by id desc limit 1".format(table_name))
         result = self.cursor.fetchone()
@@ -506,13 +543,31 @@ class DBManager:
             (tmp_id, city_id, city_name, is_bot))
         self.conn.commit()
 
+    def set_new_capital_in_game_table(self, user_id, country_id):
+        """Метод записывает новую страну в игровую таблицу
+        :param user_id - id пользователя
+        :param country_id - id страны
+        """
+
+        table_name = '{}{}'.format('game_capitals.capitals_', user_id)
+
+        self.cursor.execute("SELECT id from {} order by id desc limit 1".format(table_name))
+        result = self.cursor.fetchone()
+        self.conn.commit()
+        tmp_id = 1 if not result else result[0] + 1
+
+        self.cursor.execute(
+            """INSERT INTO {}(id, country_id)VALUES (%s, %s);""".format(table_name),
+            (tmp_id, country_id))
+        self.conn.commit()
+
     def select_random_city_against_user_city(self, user_id, city_name):
         """Метод возвращает случайный город, основываясь на городе пользователя
         :param user_id - id юзера
         :param city_name - название города
         """
 
-        table_name = '{}{}'.format('admin.cities_', user_id)
+        table_name = '{}{}'.format('game_cities.cities_', user_id)
 
         if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы', 'ё']:
             last_let = city_name[-2]
@@ -540,6 +595,123 @@ class DBManager:
 
         return random_city_name
 
+    def select_random_capital(self, user_id):
+        """Метод выбирает случайную страну из списка еще не выбранных для игры
+        :param user_id - id юзера
+        """
+
+        table_name = '{}{}'.format('game_capitals.capitals_', user_id)
+
+        # Получаем список оставшихся стран
+        self.cursor.execute(
+            "select id, country from admin.game_capitals WHERE id NOT IN "
+            "(select country_id from {})".format(table_name))
+        self.conn.commit()
+        all_list = self.cursor.fetchall()
+        random_int = randint(0, len(all_list) - 1)
+
+        # Выбираем случайную страну из списка
+        random_country_id = all_list[random_int][0]
+        random_country_name = all_list[random_int][1]
+
+        # Записываем в игровую таблицу новый город
+        self.set_new_capital_in_game_table(user_id, random_country_id)
+
+        return random_country_name
+
+    def get_last_capital_id(self, user_id):
+        """Метод получает id текущей столицы в игре
+        :param user_id - id пользователя
+        """
+
+        table_name = '{}{}'.format('game_capitals.capitals_', user_id)
+
+        self.cursor.execute("SELECT country_id from {} order by id desc limit 1".format(table_name))
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result
+
+    def is_right_capital(self, user_id, capital):
+        """Проверка, верную ли столицу назвал игрок
+        :param user_id - id пользователя
+        :param capital - столица, которую назвал игрок
+        """
+
+        # Получаем id текущей столицы
+        country_id = self.get_last_capital_id(user_id)[0]
+
+        self.cursor.execute("""SELECT id from admin.game_capitals WHERE capital ilike %s""", [capital])
+        self.conn.commit()
+        result = self.cursor.fetchone()
+        if result:
+            if result[0] == country_id:
+                return True
+
+        else:
+            self.cursor.execute("""SELECT id from admin.game_capitals_dif WHERE capital_name_dif ilike %s""", [capital])
+            self.conn.commit()
+            result = self.cursor.fetchone()
+            if result:
+                if result[0] == country_id:
+                    return True
+
+        return False
+
+    def return_capital(self, user_id):
+        """метод возвращает название столицы
+        :param user_id - id пользователя
+        """
+
+        # Получаем id текущей столицы
+        country_id = self.get_last_capital_id(user_id)
+
+        self.cursor.execute("""SELECT capital from admin.game_capitals WHERE id=%s""", [country_id])
+        self.conn.commit()
+        result = self.cursor.fetchone()
+
+        return result[0]
+
+    def is_game_over(self, user_id):
+        """Проверка, не окончилась ли уже игра
+        :param user_id - id пользователя
+        """
+
+        table_name = '{}{}'.format('game_capitals.capitals_', user_id)
+
+        self.cursor.execute("SELECT id from {} order by id desc limit 1".format(table_name))
+        result = self.cursor.fetchone()[0]
+        self.conn.commit()
+
+        if result == 20:
+            return True
+        else:
+            return False
+
+    def set_capital(self, user_id):
+        """Метод записывает столицу в строку игры
+        :param user_id - id пользователя
+        """
+
+        country_id = self.get_last_capital_id(user_id)[0]
+        table_name = '{}{}'.format('game_capitals.capitals_', user_id)
+
+        self.cursor.execute("""UPDATE {} SET call_capital=TRUE WHERE country_id =%s;""".format(table_name), ([country_id]))
+        self.conn.commit()
+
+    def get_results_capitals(self, user_id):
+        """Изъятие результатов игры
+        :param user_id - id пользовтеля
+        """
+
+        table_name = '{}{}'.format('game_capitals.capitals_', user_id)
+
+        self.cursor.execute("SELECT * from {} WHERE call_capital is TRUE".format(table_name))
+        result = self.cursor.fetchall()
+        self.conn.commit()
+
+        return len(result)
+
     def is_city_exists(self, city):
         """Метод ищет город названный пользователем в базе
         :param city - название города
@@ -548,9 +720,15 @@ class DBManager:
         self.cursor.execute("SELECT id from admin.game_cities where place_name ilike %s ", [city])
         self.conn.commit()
         result = self.cursor.fetchone()
-
         if result:
-            return result[0]
+            return (result[0], city)
+        else:
+            self.cursor.execute("""SELECT id, place_name FROM admin.game_cities_dif where new_place_name ilike %s""",
+                                [city])
+            self.conn.commit()
+            result2 = self.cursor.fetchone()
+            if result2:
+                return (result2[0], result2[1])
 
         return False
 
@@ -561,7 +739,7 @@ class DBManager:
         :param user_id - id пользователя
         """
 
-        table_name = '{}{}'.format('admin.cities_', user_id)
+        table_name = '{}{}'.format('game_cities.cities_', user_id)
 
         self.cursor.execute("select place_id from {} where city_name ilike %s".format(table_name), [city_name])
         self.conn.commit()
@@ -578,7 +756,7 @@ class DBManager:
         :param user_city - город названный пользователем
         """
 
-        table_name = '{}{}'.format('admin.cities_', user_id)
+        table_name = '{}{}'.format('game_cities.cities_', user_id)
 
         self.cursor.execute("SELECT city_name from {} order by id desc limit 1".format(table_name))
         result = self.cursor.fetchone()
@@ -590,7 +768,7 @@ class DBManager:
         else:
             city_name = result[0]
 
-        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы']:
+        if city_name[-1] in ['ь', 'ъ', 'й', 'ю', 'ы', 'ё']:
             last_let = city_name[-2]
         else:
             last_let = city_name[-1]
@@ -609,13 +787,13 @@ class DBManager:
         :param user_id - id пользователя
         """
 
-        table_name = '{}{}'.format('admin.cities_', user_id)
+        table_name = '{}{}'.format('game_cities.cities_', user_id)
 
         self.cursor.execute("SELECT id from {} order by id desc limit 1".format(table_name))
         result = self.cursor.fetchone()[0]
         self.conn.commit()
 
-        if result > 50:
+        if result > 70:
             return True
         else:
             return False
@@ -745,5 +923,69 @@ class DBManager:
 
         return result
 
+    def get_all_problem_capitals(self):
+        """Метод вытаскивает все проблемные столицы для игры 'Столицы мира'"""
+
+        self.cursor.execute("""SELECT id, capital from admin.game_capitals
+                                    WHERE capital ilike '%ё%' or capital like '%-%'""")
+
+        self.conn.commit()
+        result = self.cursor.fetchall()
+
+        return result
+
     def set_all_problem_cities(self, problem_list):
         """Метод записывает в таблицу game_cites_dif все проблемные города"""
+
+        for problem_line in problem_list:
+            self.cursor.execute("""INSERT INTO admin.game_cities_dif(
+	                               id, place_name, new_place_name)
+	                               VALUES (%s, %s, %s);""", (problem_line[0], problem_line[1], problem_line[2]))
+            self.conn.commit()
+
+    def set_all_problem_capitals(self, problem_list):
+        """Метод записывает в таблицу game_capitals_dif все проблемные столицы"""
+
+        for problem_line in problem_list:
+            self.cursor.execute("""INSERT INTO admin.game_capitals_dif(
+        	                               id, capital_name, capital_name_dif)
+        	                               VALUES (%s, %s, %s);""", (problem_line[0], problem_line[1], problem_line[2]))
+            self.conn.commit()
+
+    def get_chat_ids(self):
+        """Метод получает все id чатов пользователей"""
+
+        self.cursor.execute("""SELECT chat_id from admin.users WHERE chat_id IS NOT null""")
+        self.conn.commit()
+        result = self.cursor.fetchall()
+        result_list = [chat_id[0] for chat_id in result]
+
+        return result_list
+
+    def set_capitals_with_countries(self, game_list):
+        """Метод заполняет таблицу стран и таблиц для игры -Столицы мира-"""
+
+        for line in game_list:
+            self.cursor.execute("SELECT id from admin.game_capitals order by id desc limit 1")
+            result = self.cursor.fetchone()
+            self.conn.commit()
+            tmp_id = 1 if not result else result[0] + 1
+
+            self.cursor.execute("""INSERT INTO admin.game_capitals(id, country, capital)
+	                            VALUES (%s, %s, %s);""", (tmp_id, line[0], line[1]))
+
+    def is_any_mode_activate(self, user_id):
+        """Проверка, не включен ли один из модов
+        :param user_id - id пользователя
+        """
+
+        mode1 = 'Игра "Столицы Мира"' if self.get_game_capitals_mode_stage(user_id) else ''
+        mode2 = 'Игра "Города Мира"' if self.get_game_cities_mode_stage(user_id) else ''
+        mode3 = 'Настройка погоды' if self.get_weather_edit_mode_stage(user_id) else ''
+
+        result = mode1 + mode2 + mode3
+        if result:
+            return result
+
+        return False
+

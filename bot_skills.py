@@ -5,10 +5,33 @@ import apiai
 import bs4
 import requests
 from telebot import types
-from telebot.types import ReplyKeyboardRemove
+from telebot.types import ReplyKeyboardRemove, InlineKeyboardMarkup
 
 from bot_db import check_time
 from random import randint
+
+
+class MasterOfButtons:
+    """Класс, работающий с кнопками"""
+
+    @check_time
+    def set_inline_buttons(self, *buttons):
+        """Метод размещает под сообщением кнопки
+        :param buttons - текст кнопок
+        """
+
+        markup = InlineKeyboardMarkup(row_width=len(buttons), one_time_keyboard=True, resize_keyboard=True)
+        my_buttons = [types.KeyboardButton(button_text) for button_text in buttons]
+        markup.add(*my_buttons)
+
+        return markup
+
+        markup = InlineKeyboardMarkup()
+        markup.row_width = 1
+
+        oper_txt = 'Показать' if operation == 'savereport' else 'Удалить'
+        markup.add(InlineKeyboardButton(oper_txt + " отчет", callback_data='{}_{}'.format(operation, report_id)))
+
 
 
 class MasterOfWeather:
@@ -333,13 +356,38 @@ class RandomManager:
         """Мод random five - поиск и выдача 5 случайных чисел диапазона, в случае
         если конечное значение диапазона передано корректно"""
 
-        db.set_random_five_mode(message.from_user.id, None)
-
         if message.text.isdigit():
-            result = self._get_random_five(message.text)
-            bot.send_message(message.chat.id, '5 случайных чисел: {}, {}, {}, {}, {}'.format(*result))
+            if '.' in message.text:
+                bot.send_message(message.chat.id, 'Пожалуйста, введите целое число',
+                                 reply_markup=self.set_buttons('Прервать random_5'))
+                return
+
+            elif int(message.text) <= 0 or message.text[0] == '0':
+                bot.send_message(message.chat.id, 'Пожалуйста, введите положительное целое число',
+                                 reply_markup=self.set_buttons('Прервать random_5'))
+                return
+
+            elif len(message.text) > 15:
+                bot.send_message(message.chat.id, 'Слишком большой диапазон, укажите меньше',
+                                 reply_markup=self.set_buttons('Прервать random_5'))
+                return
+            elif int(message.text) < 5:
+                bot.send_message(message.chat.id, 'Введите число больше 4',
+                                 reply_markup=self.set_buttons('Прервать random_5'))
+            else:
+                db.set_random_five_mode(message.from_user.id, None)
+                result = self._get_random_five(message.text)
+                bot.send_message(message.chat.id, '5 случайных чисел: {}, {}, {}, {}, {}'.format(*result),
+                             reply_markup=ReplyKeyboardRemove())
+
+        elif 'прервать' in message.text.lower():
+            db.set_random_five_mode(message.from_user.id, None)
+            bot.send_message(message.chat.id, 'Прерывание режима random_5',
+                             reply_markup=ReplyKeyboardRemove())
         else:
-            bot.send_message(message.chat.id, 'Ошибка: нужно положительное целое число для границы диапазона')
+            bot.send_message(message.chat.id, 'Ошибка: нужно положительное целое число для границы диапазона',
+                             reply_markup=self.set_buttons('Прервать random_5'))
+
 
     def _get_random_five(self, end_range):
         """Метод генерирует пять случайных чисел в диапазоне
@@ -355,3 +403,14 @@ class RandomManager:
                 numbers.append(random_number)
 
         return sorted(numbers)
+
+    def set_buttons(self, *buttons):
+        """Метод размещает под панелью клавиатуры одну или несколько кнопок
+        :param buttons - текст кнопок
+        """
+
+        markup = types.ReplyKeyboardMarkup(row_width=len(buttons), one_time_keyboard=True, resize_keyboard=True)
+        my_buttons = [types.KeyboardButton(button_text) for button_text in buttons]
+        markup.add(*my_buttons)
+
+        return markup

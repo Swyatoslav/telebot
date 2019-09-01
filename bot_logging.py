@@ -137,6 +137,15 @@ class LogManager:
             bot.send_message(message.chat.id, '*Аварийный выход из игры "Города мира"*', reply_markup=ReplyKeyboardRemove(),
                              parse_mode='Markdown')
 
+        # информация про игру Столицы
+        elif db.get_game_capitals_mode_stage(uid):
+            game_capitals_stage = db.get_game_capitals_mode_stage(uid)
+            db.set_game_capitals_mode(uid, None)
+            err_report += 'Game capitals mode: True\nGame capitals stage: {}\n'.format(game_capitals_stage)
+            time.sleep(0.5)
+            bot.send_message(message.chat.id, '*Аварийный выход из игры "Столицы мира"*', reply_markup=ReplyKeyboardRemove(),
+                             parse_mode='Markdown')
+
         # Формирование stacktrace
         err_stacktrace = ''.join(traceback.format_exception(etype=type(err), value=err, tb=err.__traceback__))
         if len(err_stacktrace) > 3950:
