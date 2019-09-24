@@ -982,10 +982,43 @@ class DBManager:
         mode1 = 'Игра "Столицы Мира"' if self.get_game_capitals_mode_stage(user_id) else ''
         mode2 = 'Игра "Города Мира"' if self.get_game_cities_mode_stage(user_id) else ''
         mode3 = 'Настройка погоды' if self.get_weather_edit_mode_stage(user_id) else ''
+        mode4 = 'Игра "Космический квест"' if self.get_space_quest_mode(user_id) else ''
 
-        result = mode1 + mode2 + mode3
+        result = mode1 + mode2 + mode3 + mode4
         if result:
             return result
 
         return False
+
+    def get_image_path(self, image_name):
+        """Возвращает путь до картинки
+        :param image_name - Название картинки
+        """
+
+        self.cursor.execute("""SELECT path FROM space_quest.images where name=%s""",
+                            [image_name])
+        result = self.cursor.fetchone()[0]
+        self.conn.commit()
+
+        return result
+
+    def set_space_quest_mode(self, user_id, stage):
+        """Выставление этапа игры Космический квест
+        :param user_id - Id пользователя
+        :param stage - название этара
+        """
+
+        self.cursor.execute("""UPDATE admin.users SET space_quest=%s WHERE id = %s;""", (stage, user_id))
+        self.conn.commit()
+
+    def get_space_quest_mode(self, user_id):
+        """Метод возвращает текущую стадию игры Космический квест"""
+
+        self.cursor.execute('SELECT space_quest FROM admin.users where id=%s', [user_id])
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result[0]
+
+
 

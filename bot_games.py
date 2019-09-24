@@ -1,29 +1,18 @@
 import time
 
 import wikipedia
-from telebot import types
 from telebot.types import ReplyKeyboardRemove
 
 from bot_db import check_time
+from bot_tools import BotButtons
 
 
-class CitiesGameManager:
+class CitiesGameManager(object):
     """Класс для работы с игрой Города"""
 
     btn1 = 'Начнем игру'
     btn2 = 'Прервать игру'
-
-    @check_time
-    def set_buttons(self, *buttons):
-        """Метод размещает под панелью клавиатуры одну или несколько кнопок
-        :param buttons - текст кнопок
-        """
-
-        markup = types.ReplyKeyboardMarkup(row_width=len(buttons), one_time_keyboard=True, resize_keyboard=True)
-        my_buttons = [types.KeyboardButton(button_text) for button_text in buttons]
-        markup.add(*my_buttons)
-
-        return markup
+    bb = BotButtons()
 
     @check_time
     def game_mode(self, message, db, bot):
@@ -51,7 +40,7 @@ class CitiesGameManager:
                                  reply_markup=ReplyKeyboardRemove())
             time.sleep(2)
             bot.send_message(message.chat.id, 'Итак, мой город {}. Ваша очередь :)'.format(city),
-                             reply_markup=self.set_buttons('Прервать игру'))
+                             reply_markup=self.bb.gen_underline_butons('Прервать игру'))
             return
 
         phase = db.get_game_cities_mode_stage(message.from_user.id)
@@ -87,7 +76,8 @@ class CitiesGameManager:
         time.sleep(0.5)
         bot.send_message(message.chat.id, info_msg1)
         time.sleep(1)
-        bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons('Начнем игру', 'Прервать игру'))
+        bot.send_message(message.chat.id, info_msg2,
+                         reply_markup=self.bb.gen_underline_butons('Начнем игру', 'Прервать игру'))
 
     def _first_game_cities_stage(self, message, db, bot):
         """Первая стадия игры
@@ -107,7 +97,7 @@ class CitiesGameManager:
             db.set_game_cities_mode(message.from_user.id, 'Игра')
             db.create_tmp_game_cities_table(message.from_user.id)
             bot.send_message(message.chat.id, rules,
-                             reply_markup=self.set_buttons('Прервать игру'),
+                             reply_markup=self.bb.gen_underline_butons('Прервать игру'),
                              parse_mode='Markdown')
             time.sleep(1)
             bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город.')
@@ -119,7 +109,7 @@ class CitiesGameManager:
             self._hello_stage_game_cities(message, db, bot, first_time=False)
         else:
             bot.send_message(message.chat.id, 'Включена игра "Города". Прервать игру?',
-                             reply_markup=self.set_buttons('Прервать', 'Продолжить'))
+                             reply_markup=self.bb.gen_underline_butons('Прервать', 'Продолжить'))
 
     def _second_game_cities_stage(self, message, db, bot):
         """Вторая стадия игры - сама игра
@@ -139,23 +129,23 @@ class CitiesGameManager:
                         bot.send_message(message.chat.id, 'Вы победили! Игра окончена :)',
                                          reply_markup=ReplyKeyboardRemove())
                         db.set_game_cities_mode(message.from_user.id, None)
-                        db.drop_tmp_table('admin.cities_{}'.format(message.from_user.id))
+                        db.drop_tmp_table('game_cities.cities_{}'.format(message.from_user.id))
                     else:
                         bot_city = db.select_random_city_against_user_city(message.from_user.id, city_name)
                         bot.send_message(message.chat.id, '*{}*'.format(bot_city),
-                                         reply_markup=self.set_buttons('Прервать игру',
+                                         reply_markup=self.bb.gen_underline_butons('Прервать игру',
                                                                        'Узнать про {}'.format(bot_city)),
                                          parse_mode='Markdown')
                 else:
                     bot.send_message(message.chat.id, 'Названный вами город начинается\n'
                                                       ' не с последней буквы предыдущего! ',
-                                     reply_markup=self.set_buttons('Прервать игру'))
+                                     reply_markup=self.bb.gen_underline_butons('Прервать игру'))
             else:
                 bot.send_message(message.chat.id, 'Город уже был назван! Введите другой',
-                                 reply_markup=self.set_buttons('Прервать игру'))
+                                 reply_markup=self.bb.gen_underline_butons('Прервать игру'))
         else:
             bot.send_message(message.chat.id, 'Извините, я не знаю такого города. Введите другой',
-                             reply_markup=self.set_buttons('Прервать игру'))
+                             reply_markup=self.bb.gen_underline_butons('Прервать игру'))
 
     @check_time
     def get_info_about_city(self, city):
@@ -176,10 +166,11 @@ class CitiesGameManager:
             return False
 
 
-class CapitalsGameManager:
+class CapitalsGameManager(object):
     """Класс для работы с игрой -Столицы мира-"""
 
     cm = CitiesGameManager()
+    bb = BotButtons()
 
     @check_time
     def game_mode(self, message, db, bot):
@@ -228,7 +219,8 @@ class CapitalsGameManager:
         time.sleep(0.5)
         bot.send_message(message.chat.id, info_msg1, parse_mode="Markdown")
         time.sleep(1)
-        bot.send_message(message.chat.id, info_msg2, reply_markup=self.cm.set_buttons('Начнем игру', 'Прервать игру'))
+        bot.send_message(message.chat.id, info_msg2,
+                         reply_markup=self.bb.gen_underline_butons('Начнем игру', 'Прервать игру'))
 
     def _first_game_capitals_stage(self, message, db, bot):
         """Первая стадия игры
@@ -271,7 +263,7 @@ class CapitalsGameManager:
                     hide_capital += capital[i]
 
             bot.send_message(message.chat.id, 'Подсказка: {}'.format(hide_capital),
-                             reply_markup=self.cm.set_buttons('Не знаю', 'Прервать игру'),)
+                             reply_markup=self.bb.gen_underline_butons('Не знаю', 'Прервать игру'),)
 
             return
 
@@ -291,7 +283,7 @@ class CapitalsGameManager:
 
         else:
             bot.send_message(message.chat.id, 'Неверно.. Попробуйте ещё раз :) Или сдаетесь?',
-                             reply_markup=self.cm.set_buttons('Подсказка', 'Не знаю', 'Прервать игру'))
+                             reply_markup=self.bb.gen_underline_butons('Подсказка', 'Не знаю', 'Прервать игру'))
             return
 
     def _get_new_capital(self, db, bot, message):
@@ -304,7 +296,7 @@ class CapitalsGameManager:
         country_name = db.select_random_capital(message.from_user.id)
         time.sleep(0.5)
         bot.send_message(message.chat.id, '*{} - ?*'.format(country_name),
-                         reply_markup=self.cm.set_buttons('Подсказка', 'Не знаю', 'Прервать игру'),
+                         reply_markup=self.bb.gen_underline_butons('Подсказка', 'Не знаю', 'Прервать игру'),
                          parse_mode='Markdown')
 
     def _game_over(self, db, bot, message):
@@ -324,3 +316,38 @@ class CapitalsGameManager:
         db.set_game_capitals_mode(message.from_user.id, None)
         bot.send_message(message.chat.id, 'Ваш результат: {} из 20'.format(result))
         bot.send_message(message.chat.id, 'Спасибо за игру!', reply_markup=ReplyKeyboardRemove())
+
+
+class SpaceQuest(object):
+    """Космический квест"""
+
+    bb = BotButtons()
+
+    def game_mode(self, message, db, bot):
+        """Игра 'Космический квест'"""
+
+        stage = db.get_space_quest_mode(message.from_user.id)
+
+        if 'прервать' in message.text.lower():
+            db.set_space_quest_mode(message.from_user.id, None)
+            bot.send_message(message.chat.id, 'Хорошо, доиграем позже :)')
+            return
+
+        if not db.get_space_quest_mode(message.from_user.id):
+            self.start_menu(message, db, bot)
+        else:
+            pass
+
+    def start_menu(self, message, db, bot):
+        """Стартовый экран игры
+        :param message - сообщение пользователя
+        :param db - экземпляр БД
+        :param bot - экземпляр бота
+        """
+
+        db.set_space_quest_mode(message.from_user.id, 'Вступление')
+        logo_path = db.get_image_path('logo')
+        image = open(logo_path, 'rb')
+        bot.send_photo(message.chat.id, image, reply_markup=self.bb.gen_inline_buttons(
+            ['Начать игру', 'start'], ['Играть позже', 'later']))
+

@@ -146,6 +146,14 @@ class LogManager:
             bot.send_message(message.chat.id, '*Аварийный выход из игры "Столицы мира"*', reply_markup=ReplyKeyboardRemove(),
                              parse_mode='Markdown')
 
+        elif db.get_space_quest_mode(uid):
+            space_quest_mode = db.get_space_quest_mode(uid)
+            db.set_space_quest_mode(uid, None)
+            err_report += 'Space quest mode: True\nSpace quest stage: {}\n'.format(space_quest_mode)
+            time.sleep(0.5)
+            bot.send_message(message.chat.id, '*Аварийный выход из игры "Space quest"*', reply_markup=ReplyKeyboardRemove(),
+                             parse_mode='Markdown')
+
         # Формирование stacktrace
         err_stacktrace = ''.join(traceback.format_exception(etype=type(err), value=err, tb=err.__traceback__))
         if len(err_stacktrace) > 3950:

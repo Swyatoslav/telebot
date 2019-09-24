@@ -8,9 +8,11 @@ from telebot.types import ReplyKeyboardRemove
 from bot_config import ConfigManager
 from bot_consts import ConstantManager
 from bot_db import DBManager
-from bot_games import CitiesGameManager, CapitalsGameManager
+from bot_games import CitiesGameManager, CapitalsGameManager, SpaceQuest
 from bot_logging import LogManager
 from bot_skills import MasterOfWeather, CommunicationManager, RandomManager
+from bot_tools import BotButtons
+from bot_calls import CallsManager
 
 # Создадим конфиг
 config = ConfigManager().create_config(ConstantManager.config_path)
@@ -41,26 +43,22 @@ mow = MasterOfWeather()  # Работа с погодой
 cities_gm = CitiesGameManager()
 capitals_gm = CapitalsGameManager()
 rm = RandomManager()
+sq = SpaceQuest()
+bb = BotButtons()
+cman = CallsManager()
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    call_data = call.data.split('_')
-    if call_data[0] == 'savereport':
-        result = db.get_report_info(call_data[1])
-        if result:
-            bot.send_message('344950989', '{}{}'.format(result[0], result[1]),
-                             reply_markup=lm.gen_report_buttons(call_data[1], 'delreport'))
-        else:
-            bot.answer_callback_query(call.id, "Данный отчет удалён")
-
-    elif call_data[0] == 'delreport':
-        db.delete_report(call_data[1])
-        bot.answer_callback_query(call.id, "Отчет {} успешно удален".format(call_data[1]))
+    mods = db.is_any_mode_activate(call.from_user.id)
+    if mods:
+        cman.call_trigger(db, bot, call, mods)
+    else:
+        cman.report_calls(db, bot, call)
 
 
 @bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather', 'game_cities', 'random_5',
-                               'glr', 'send_update_message', 'send_user_message', 'game_capitals'])
+                               'glr', 'send_update_message', 'send_user_message', 'game_capitals', 'space_quest'])
 @db.set_user_info
 @lm.log_message
 def start_message(message):
@@ -68,14 +66,14 @@ def start_message(message):
         mods = db.is_any_mode_activate(message.from_user.id)
         if mods:
             bot.send_message(message.chat.id, 'Сначала завершите программу {}'.format(mods),
-                             reply_markup=rm.set_buttons('Прервать'))
+                             reply_markup=bb.gen_underline_butons('Прервать'))
         else:
             if '/start' in message.text.lower():
                 bot.send_message(message.chat.id, hello_message, reply_markup=ReplyKeyboardRemove())
                 bot.send_message(message.chat.id, info_message, reply_markup=ReplyKeyboardRemove())
             elif '/weather' in message.text:
                 bot.send_message(message.chat.id, 'Выберите одну из кнопок внизу',
-                                 reply_markup=mow.set_buttons('Погода сегодня', 'Погода завтра'))
+                                 reply_markup=bb.gen_underline_butons('Погода сегодня', 'Погода завтра'))
             elif '/help' in message.text.lower():
                 bot.send_message(message.chat.id, info_message, reply_markup=ReplyKeyboardRemove())
             elif message.text == '!' and message.from_user.id == 344950989:
@@ -91,7 +89,7 @@ def start_message(message):
                                                   '{} ({})\n'
                                                   'Если желаете изменить его, нажмите\n'
                                                   'соответствующую кнопку'.format(result[1], result[2]),
-                                 reply_markup=mow.set_buttons('Желаю изменить', 'Оставлю как есть'))
+                                 reply_markup=bb.gen_underline_butons('Желаю изменить', 'Оставлю как есть'))
             elif 'new_weather' in message.text and not db.is_weather_place_set(message.from_user.id):
                 bot.send_message(message.chat.id, 'Чтобы поменять место, его нужно сначало установить :)\n'
                                                   'Сделайте это с помощью команды /weather')
@@ -104,7 +102,7 @@ def start_message(message):
                 db.set_random_five_mode(message.from_user.id, True)
                 time.sleep(0.5)
                 bot.send_message(message.chat.id, 'Введите максимально возможное число диапазона',
-                                 reply_markup=rm.set_buttons('Прервать random_5'))
+                                 reply_markup=bb.gen_underline_butons('Прервать random_5'))
 
             elif 'glr' in message.text and message.from_user.id == 344950989:
                 last_report_id = db.get_last_report_id()
@@ -115,7 +113,10 @@ def start_message(message):
                 else:
                     bot.send_message('344950989', 'Отчеты об ошибках отсутствуют')
 
-            elif 'send_update_message' in message.text and message.from_user.id == 344950989:
+            elif 'space_quest' in message.text and message.from_user.id == 344950989:
+                sq.game_mode(message, db, bot)
+
+            # elif 'send_update_message' in message.text and message.from_user.id == 344950989:
                 chat_ids = db.get_chat_ids()
                 # for chat_id in chat_ids:
                 #     try:
@@ -150,6 +151,8 @@ def send_text(message):
             cities_gm.game_mode(message, db, bot)
         elif db.get_game_capitals_mode_stage(message.from_user.id):
             capitals_gm.game_mode(message, db, bot)
+        elif db.get_space_quest_mode(message.from_user.id):
+            sq.game_mode(message, db, bot)
         # ========= Общение ===========
         elif cm.is_weather_question(message.text):
             bot.send_message(message.chat.id, 'Секундочку')

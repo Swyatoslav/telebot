@@ -1,42 +1,20 @@
 import json
 from datetime import date
+from random import randint
 
 import apiai
 import bs4
 import requests
-from telebot import types
-from telebot.types import ReplyKeyboardRemove, InlineKeyboardMarkup
+from telebot.types import ReplyKeyboardRemove
 
 from bot_db import check_time
-from random import randint
+from bot_tools import BotButtons
 
 
-class MasterOfButtons:
-    """Класс, работающий с кнопками"""
-
-    @check_time
-    def set_inline_buttons(self, *buttons):
-        """Метод размещает под сообщением кнопки
-        :param buttons - текст кнопок
-        """
-
-        markup = InlineKeyboardMarkup(row_width=len(buttons), one_time_keyboard=True, resize_keyboard=True)
-        my_buttons = [types.KeyboardButton(button_text) for button_text in buttons]
-        markup.add(*my_buttons)
-
-        return markup
-
-        markup = InlineKeyboardMarkup()
-        markup.row_width = 1
-
-        oper_txt = 'Показать' if operation == 'savereport' else 'Удалить'
-        markup.add(InlineKeyboardButton(oper_txt + " отчет", callback_data='{}_{}'.format(operation, report_id)))
-
-
-
-class MasterOfWeather:
+class MasterOfWeather(object):
     """Класс, работающий с парсингом погоды (Мастер над погодой)"""
 
+    bb = BotButtons()
     cur_day = date.today().day
 
     today_elm = ".forecast-details>dd:nth-child(2)"
@@ -61,7 +39,7 @@ class MasterOfWeather:
 
         bot.send_message(message.chat.id, info_msg1)
         db.set_weather_edit_mode(message.from_user.id, self.first_phase)
-        bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons(self.btn1, self.btn2))
+        bot.send_message(message.chat.id, info_msg2, reply_markup=self.bb.gen_underline_butons(self.btn1, self.btn2))
 
     @check_time
     def _first_phase_to_set_place(self, message, db, bot):
@@ -73,17 +51,18 @@ class MasterOfWeather:
         """
 
         info_msg1 = 'Хорошо, начнем настройку :)'
-        info_msg2 = 'Введите, пожалуйста, название своего\n'\
-                    'населенного пункта (без слов "Город", "Деревня" и тп.)\n\n'\
+        info_msg2 = 'Введите, пожалуйста, название своего\n' \
+                    'населенного пункта (без слов "Город", "Деревня" и тп.)\n\n' \
                     'Прошу вас вводить название без ошибок :)'
         info_msg3 = 'Вы находитесь в режиме настройки погоды. Прервать настройку?'
 
         if self.btn2 in message.text:
             db.set_weather_edit_mode(message.from_user.id, self.second_phase)
             bot.send_message(message.chat.id, info_msg1)
-            bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons(self.btn1))
+            bot.send_message(message.chat.id, info_msg2, reply_markup=self.bb.gen_underline_butons(self.btn1))
         else:
-            bot.send_message(message.chat.id, info_msg3, reply_markup=self.set_buttons(self.btn1, self.btn2))
+            bot.send_message(message.chat.id, info_msg3,
+                             reply_markup=self.bb.gen_underline_butons(self.btn1, self.btn2))
 
     @check_time
     def _second_phase_to_set_place(self, message, db, bot):
@@ -106,12 +85,12 @@ class MasterOfWeather:
         result = db.get_place_info_by_name(message.text)
 
         if not result:  # результаты поиска отсутствуют
-            bot.send_message(message.chat.id, info_msg1, reply_markup=self.set_buttons(self.btn1))
+            bot.send_message(message.chat.id, info_msg1, reply_markup=self.bb.gen_underline_butons(self.btn1))
         elif len(result) > 1:  # найдено несколько результатов
             tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)  # создаем временную таблицу
             db.set_tmp_result_of_search_weather_place(tmp_table, result)  # записываем результаты во временную таблицу
             db.set_weather_edit_mode(message.from_user.id, self.third_phase)  # переходим к фазе выбора нужного места
-            bot.send_message(message.chat.id, info_msg2, reply_markup=self.set_buttons('Моего здесь нет'))
+            bot.send_message(message.chat.id, info_msg2, reply_markup=self.bb.gen_underline_butons('Моего здесь нет'))
             result_list = db.get_all_info_from_tmp_weather_places(tmp_table)
 
             # формируем сообщение с вариантами выбора из найденных результатов поиска
@@ -136,8 +115,8 @@ class MasterOfWeather:
 
         else:
             bot.send_message(message.chat.id, '{} ({}), верно?'.format(result[0][2], result[0][1]),
-                             reply_markup=self.set_buttons('Верно', 'Неверно'))
-            
+                             reply_markup=self.bb.gen_underline_butons('Верно', 'Неверно'))
+
             # Запись результатов поиска во временную бд
             tmp_table = db.create_tmp_table_for_search_place(message.from_user.id)
             db.set_tmp_result_of_search_weather_place(tmp_table, result)
@@ -179,12 +158,13 @@ class MasterOfWeather:
         :param tmp_table - название временной таблицы
         """
 
-        info_msg='Настройка успешно завершена :)\nСохранено: {}, {}\nВыберите нужную кнопку\n'.format(
-                             result_info[3], result_info[2])
+        info_msg = 'Настройка успешно завершена :)\nСохранено: {}, {}\nВыберите нужную кнопку\n'.format(
+            result_info[3], result_info[2])
 
         db.set_place_id_to_user(result_info[1], message.from_user.id)  # Записываем id места юзеру в таблицу
         db.set_weather_edit_mode(message.from_user.id, None)  # Закрываем режим настройки
-        bot.send_message(message.chat.id, info_msg, reply_markup=self.set_buttons('Погода сегодня', 'Погода завтра'))
+        bot.send_message(message.chat.id, info_msg,
+                         reply_markup=self.bb.gen_underline_butons('Погода сегодня', 'Погода завтра'))
         db.drop_tmp_table(tmp_table)
 
     @check_time
@@ -232,18 +212,6 @@ class MasterOfWeather:
         weather.insert(2, day_txt)  # День, когда смотрим погоду
 
         return '{0} ({1})\nПогода на {2}\n{3}{4}{5}{6}'.format(*weather)
-
-    @check_time
-    def set_buttons(self, *buttons):
-        """Метод размещает под панелью клавиатуры одну или несколько кнопок
-        :param buttons - текст кнопок
-        """
-
-        markup = types.ReplyKeyboardMarkup(row_width=len(buttons), one_time_keyboard=True, resize_keyboard=True)
-        my_buttons = [types.KeyboardButton(button_text) for button_text in buttons]
-        markup.add(*my_buttons)
-
-        return markup
 
     @check_time
     def _parse_weather_info(self, day_part, day_txt, bs):
@@ -349,8 +317,10 @@ class CommunicationManager:
         return False
 
 
-class RandomManager:
+class RandomManager(object):
     """Менеджер по работе с модом random five"""
+
+    bb = BotButtons()
 
     def random_five_mode(self, message, db, bot):
         """Мод random five - поиск и выдача 5 случайных чисел диапазона, в случае
@@ -359,26 +329,26 @@ class RandomManager:
         if message.text.isdigit():
             if '.' in message.text:
                 bot.send_message(message.chat.id, 'Пожалуйста, введите целое число',
-                                 reply_markup=self.set_buttons('Прервать random_5'))
+                                 reply_markup=self.bb.gen_underline_butons('Прервать random_5'))
                 return
 
             elif int(message.text) <= 0 or message.text[0] == '0':
                 bot.send_message(message.chat.id, 'Пожалуйста, введите положительное целое число',
-                                 reply_markup=self.set_buttons('Прервать random_5'))
+                                 reply_markup=self.bb.gen_underline_butons('Прервать random_5'))
                 return
 
             elif len(message.text) > 15:
                 bot.send_message(message.chat.id, 'Слишком большой диапазон, укажите меньше',
-                                 reply_markup=self.set_buttons('Прервать random_5'))
+                                 reply_markup=self.bb.gen_underline_butons('Прервать random_5'))
                 return
             elif int(message.text) < 5:
                 bot.send_message(message.chat.id, 'Введите число больше 4',
-                                 reply_markup=self.set_buttons('Прервать random_5'))
+                                 reply_markup=self.bb.gen_underline_butons('Прервать random_5'))
             else:
                 db.set_random_five_mode(message.from_user.id, None)
                 result = self._get_random_five(message.text)
                 bot.send_message(message.chat.id, '5 случайных чисел: {}, {}, {}, {}, {}'.format(*result),
-                             reply_markup=ReplyKeyboardRemove())
+                                 reply_markup=ReplyKeyboardRemove())
 
         elif 'прервать' in message.text.lower():
             db.set_random_five_mode(message.from_user.id, None)
@@ -386,8 +356,7 @@ class RandomManager:
                              reply_markup=ReplyKeyboardRemove())
         else:
             bot.send_message(message.chat.id, 'Ошибка: нужно положительное целое число для границы диапазона',
-                             reply_markup=self.set_buttons('Прервать random_5'))
-
+                             reply_markup=self.bb.gen_underline_butons('Прервать random_5'))
 
     def _get_random_five(self, end_range):
         """Метод генерирует пять случайных чисел в диапазоне
@@ -403,14 +372,3 @@ class RandomManager:
                 numbers.append(random_number)
 
         return sorted(numbers)
-
-    def set_buttons(self, *buttons):
-        """Метод размещает под панелью клавиатуры одну или несколько кнопок
-        :param buttons - текст кнопок
-        """
-
-        markup = types.ReplyKeyboardMarkup(row_width=len(buttons), one_time_keyboard=True, resize_keyboard=True)
-        my_buttons = [types.KeyboardButton(button_text) for button_text in buttons]
-        markup.add(*my_buttons)
-
-        return markup
