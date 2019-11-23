@@ -17,8 +17,8 @@ class MasterOfWeather(object):
     bb = BotButtons()
     cur_day = date.today().day
 
-    today_elm = ".forecast-details>dd:nth-child(2)"
-    tomorrow_elm = '.forecast-details>dd:nth-child(5)'
+    today_elm = ".forecast-details>div:nth-child(1)"
+    tomorrow_elm = '.forecast-details>div:nth-child(3)'
 
     btn1 = 'Прервать настройку'
     btn2 = 'Продолжить настройку'
@@ -253,6 +253,7 @@ class MasterOfWeather(object):
         clearSky = u'\U00002600' if day_part != 'Ночь' else u'\U0001F303'
         fewClouds = u'\U000026C5' if day_part != 'Ночь' else u'\U0001F303'
         clouds = u'\U00002601'
+        snow = u'\U00002744'
         hot = u'\U0001F525'
 
         weather_query = {'Облачно с прояснениями': fewClouds,
@@ -262,6 +263,8 @@ class MasterOfWeather(object):
                          'Ясно': clearSky,
                          'Пасмурно': clouds,
                          'Ливень': thunderstorm,
+                         'Небольшой снег': snow,
+                         'Снег': f'{snow} {snow}'
                          }
 
         return weather_query[condition]

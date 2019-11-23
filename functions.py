@@ -246,5 +246,8 @@ def parse_all_countries_with_capitals():
     return result
 
 
+def send_message()
+
+
 problem_list = get_problem_capitals()
 db.set_all_problem_capitals(problem_list)
