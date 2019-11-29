@@ -6,6 +6,8 @@ import sys
 
 import bs4
 import requests
+from bot_logging import LogManager
+
 
 from bot_config import ConfigManager
 from bot_db import DBManager
@@ -13,6 +15,7 @@ import wikipedia
 from itertools import groupby
 
 site = 'https://yandex.ru/pogoda/region/225?from=main_other_cities'
+lm = LogManager()
 
 # создаем экземпляр бд
 config_path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'config.ini')
@@ -246,8 +249,13 @@ def parse_all_countries_with_capitals():
     return result
 
 
-def send_message()
+def send_message(bot, chat_id, message, **kwargs):
+    """Function to sending message tp user channel
+    :param bot - telegramm bot instance
+    :param chat_id - id of user channel
+    :param message - message to user from bot
+    """
 
+    lm.bot_message(chat_id, message)
+    bot.send_message(chat_id, message, **kwargs)
 
-problem_list = get_problem_capitals()
-db.set_all_problem_capitals(problem_list)

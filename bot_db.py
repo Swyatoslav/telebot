@@ -1,6 +1,7 @@
 import datetime
 import time
 from random import randint
+from datetime import timedelta
 
 import psycopg2
 from telebot.types import Message
@@ -223,10 +224,7 @@ class DBManager:
     def is_admin_id(self, user_id):
         """Метод проверяет, id админа передано или нет"""
 
-        self.cursor.execute("SELECT id FROM admin.users WHERE user_name = 'Святослав Ященко';")
-        self.conn.commit()
-
-        return self.cursor.fetchone()[0] == user_id
+        return user_id == 344950989
 
     @check_time
     def set_regions_info(self, region_hrefs, region_names):
@@ -814,14 +812,121 @@ class DBManager:
         :param user_id - id пользователя
         """
 
-        self.cursor.execute("""SELECT is_random_5
-	                           FROM admin.users
-	                           WHERE id=%s;""", [user_id])
+        self.cursor.execute("""SELECT is_random_5 FROM admin.users WHERE id=%s;""", [user_id])
         self.conn.commit()
 
         result = self.cursor.fetchone()[0]
 
         return result
+
+    def get_notes_mode_stage(self, user_id):
+        """Метод возвращает значение режима notes пользователя
+        :param user_id - id пользователя
+        """
+
+        self.cursor.execute("""SELECT note FROM admin.users WHERE id=%s;""", [user_id])
+        self.conn.commit()
+
+        result = self.cursor.fetchone()[0]
+
+        return result
+
+    def set_notes_mode_stage(self, user_id, stage):
+        """Выставление мода заметок"""
+
+        self.cursor.execute("""UPDATE admin.users SET note=%s WHERE id = %s;""", (stage, user_id))
+        self.conn.commit()
+
+    def save_note(self, user_id, note_head):
+        """Method saving some note
+        :param user_id - id пользователя
+        :param note_head - Заголовок заметки
+        :param note_text - Тело заметки
+        """
+
+        moskow_time = datetime.datetime.now() - timedelta(hours=4)
+        note_time = moskow_time.strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = round(time.time())
+
+        self.cursor.execute("SELECT id from admin.user_notes order by id desc limit 1")
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        # Проверяем id. Если база пустая, задаем id = 1 Для избежания ошибки при записи
+        if result is None:
+            note_id = int(f'1{timestamp}')
+        else:
+            note_id = int(f'{result[0] + 1}{timestamp}')
+
+        self.cursor.execute("""INSERT INTO admin.user_notes(id, uid, note_head, note_body, note_time) 
+        VALUES (%s, %s, %s, %s, %s);""", (note_id, user_id, note_head, None, note_time))
+        self.conn.commit()
+
+    def update_note(self, uid, head_text=None, body_text=None, note_id=None):
+        """Метод обновляет содержимое заметки
+        :param uid - id пользователя
+        :param head_text - новый заголовок заметки
+        :param body_text - новое содержимое заметки
+        :param note_id - id нужной заметки (если нет, редактируем последнюю заметку юзера)
+        """
+
+        moskow_time = datetime.datetime.now() - timedelta(hours=4)
+        new_note_time = moskow_time.strftime('%Y-%m-%d %H:%M:%S')
+
+        # Определяем id редактируемой заметки
+        if not note_id:
+            self.cursor.execute("SELECT id from admin.user_notes WHERE uid=%s order by id desc limit 1", [uid])
+            edit_note_id = self.cursor.fetchone()
+            self.conn.commit()
+        else:
+            edit_note_id = note_id
+
+        # Проводим редактирование
+        if head_text:
+            self.cursor.execute("""UPDATE admin.user_notes SET note_head=%s, note_time=%s WHERE id=%s;""",
+                                (head_text, new_note_time, edit_note_id))
+        elif body_text:
+            self.cursor.execute("""UPDATE admin.user_notes SET note_body=%s, note_time=%s WHERE id=%s;""",
+                                (body_text, new_note_time, edit_note_id))
+        else:
+            self.cursor.execute("""UPDATE admin.user_notes SET note_time=%s WHERE id=%s;""",
+                                (new_note_time, edit_note_id))
+        self.conn.commit()
+
+    def get_all_user_notes(self, uid):
+        """Метод вытаскивает все заметки пользователя
+        :param uid - id пользователя
+        """
+
+        self.cursor.execute("""SELECT note_time, note_head, id FROM admin.user_notes 
+        WHERE uid = %s;""", [uid])
+
+        result = self.cursor.fetchall()
+        self.conn.commit()
+
+        return result
+
+
+    def get_note_by_id(self, note_id):
+        """Метод вытаскивает id заметки
+        :param note_id - id заметки
+        """
+
+        self.cursor.execute("""SELECT note_time, note_head, note_body FROM admin.user_notes 
+        WHERE id = %s;""", [note_id])
+
+        result = self.cursor.fetchone()
+        self.conn.commit()
+
+        return result
+
+    def remove_note_by_id(self, note_id):
+        """Метод удаляет заметку по id
+        :param note_id - id заметки
+        """
+
+        self.cursor.execute("""DELETE FROM admin.user_notes WHERE id=%s;""", [note_id])
+        self.conn.commit()
 
     def set_all_game_cities(self, all_cities):
         """Метод заполняет базу всеми городами мира
@@ -983,8 +1088,9 @@ class DBManager:
         mode2 = 'Игра "Города Мира"' if self.get_game_cities_mode_stage(user_id) else ''
         mode3 = 'Настройка погоды' if self.get_weather_edit_mode_stage(user_id) else ''
         mode4 = 'Игра "Космический квест"' if self.get_space_quest_mode(user_id) else ''
+        mode5 = 'Заметки' if self.get_notes_mode_stage(user_id) else ''
 
-        result = mode1 + mode2 + mode3 + mode4
+        result = mode1 + mode2 + mode3 + mode4 + mode5
         if result:
             return result
 

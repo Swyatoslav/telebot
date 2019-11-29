@@ -5,6 +5,7 @@ from telebot.types import ReplyKeyboardRemove
 
 from bot_db import check_time
 from bot_tools import BotButtons
+from functions import send_message
 
 
 class CitiesGameManager(object):
@@ -24,22 +25,22 @@ class CitiesGameManager(object):
 
         if 'прервать' in message.text.lower() or 'прервем' in message.text.lower():
             db.set_game_cities_mode(message.from_user.id, None)
-            bot.send_message(message.chat.id, 'Хорошо, поиграем в другой раз!',
+            send_message(bot, message.chat.id, 'Хорошо, поиграем в другой раз!',
                              reply_markup=ReplyKeyboardRemove())
             return
         elif 'Узнать про' in message.text:
             city = message.text.split('Узнать про')[1]
             time.sleep(0.5)
-            bot.send_message(message.chat.id, 'Подождите, ищу информацию про{}..'.format(city))
+            send_message(bot, message.chat.id, 'Подождите, ищу информацию про{}..'.format(city))
             city_info = self.get_info_about_city(city)
             if city_info:
-                bot.send_message(message.chat.id, city_info, reply_markup=ReplyKeyboardRemove())
+                send_message(bot, message.chat.id, city_info, reply_markup=ReplyKeyboardRemove())
             else:
-                bot.send_message(message.chat.id, 'К сожалению, пока я не могу\n'
+                send_message(bot, message.chat.id, 'К сожалению, пока я не могу\n'
                                                   ' ничего рассказать про{}'.format(city),
                                  reply_markup=ReplyKeyboardRemove())
             time.sleep(2)
-            bot.send_message(message.chat.id, 'Итак, мой город {}. Ваша очередь :)'.format(city),
+            send_message(bot, message.chat.id, 'Итак, мой город {}. Ваша очередь :)'.format(city),
                              reply_markup=self.bb.gen_underline_butons('Прервать игру'))
             return
 
@@ -63,7 +64,7 @@ class CitiesGameManager(object):
         db.set_game_cities_mode(message.from_user.id, 'Вступление')
         if first_time:
             time.sleep(0.5)
-            bot.send_message(message.chat.id, 'Приветствую вас в игре Города!')
+            send_message(bot, message.chat.id, 'Приветствую вас в игре Города!')
 
         info_msg1 = 'Правила очень простые:\n' \
                     'Я называю один из городов,\n' \
@@ -74,9 +75,9 @@ class CitiesGameManager(object):
         info_msg2 = 'Начнем игру?'
 
         time.sleep(0.5)
-        bot.send_message(message.chat.id, info_msg1)
+        send_message(bot, message.chat.id, info_msg1)
         time.sleep(1)
-        bot.send_message(message.chat.id, info_msg2,
+        send_message(bot, message.chat.id, info_msg2,
                          reply_markup=self.bb.gen_underline_butons('Начнем игру', 'Прервать игру'))
 
     def _first_game_cities_stage(self, message, db, bot):
@@ -96,19 +97,19 @@ class CitiesGameManager(object):
         if 'начнем' in message.text.lower():
             db.set_game_cities_mode(message.from_user.id, 'Игра')
             db.create_tmp_game_cities_table(message.from_user.id)
-            bot.send_message(message.chat.id, rules,
+            send_message(bot, message.chat.id, rules,
                              reply_markup=self.bb.gen_underline_butons('Прервать игру'),
                              parse_mode='Markdown')
             time.sleep(1)
-            bot.send_message(message.chat.id, 'Первым ходите вы :) Пишите любой город.')
+            send_message(bot, message.chat.id, 'Первым ходите вы :) Пишите любой город.')
             return
 
         if 'продолжить' in message.text.lower():
-            bot.send_message(message.chat.id, 'Хорошо, напомню правила :)')
+            send_message(bot, message.chat.id, 'Хорошо, напомню правила :)')
             db.set_game_cities_mode(message.from_user.id, None)
             self._hello_stage_game_cities(message, db, bot, first_time=False)
         else:
-            bot.send_message(message.chat.id, 'Включена игра "Города". Прервать игру?',
+            send_message(bot, message.chat.id, 'Включена игра "Города". Прервать игру?',
                              reply_markup=self.bb.gen_underline_butons('Прервать', 'Продолжить'))
 
     def _second_game_cities_stage(self, message, db, bot):
@@ -126,25 +127,25 @@ class CitiesGameManager(object):
             if not db.is_city_was_called(city_name, message.from_user.id):
                 if db.is_city_starts_with_end_letter(message.from_user.id, city_name, city_id):
                     if db.is_user_already_win(message.from_user.id):
-                        bot.send_message(message.chat.id, 'Вы победили! Игра окончена :)',
+                        send_message(bot, message.chat.id, 'Вы победили! Игра окончена :)',
                                          reply_markup=ReplyKeyboardRemove())
                         db.set_game_cities_mode(message.from_user.id, None)
                         db.drop_tmp_table('game_cities.cities_{}'.format(message.from_user.id))
                     else:
                         bot_city = db.select_random_city_against_user_city(message.from_user.id, city_name)
-                        bot.send_message(message.chat.id, '*{}*'.format(bot_city),
+                        send_message(bot, message.chat.id, '*{}*'.format(bot_city),
                                          reply_markup=self.bb.gen_underline_butons('Прервать игру',
                                                                        'Узнать про {}'.format(bot_city)),
                                          parse_mode='Markdown')
                 else:
-                    bot.send_message(message.chat.id, 'Названный вами город начинается\n'
+                    send_message(bot, message.chat.id, 'Названный вами город начинается\n'
                                                       ' не с последней буквы предыдущего! ',
                                      reply_markup=self.bb.gen_underline_butons('Прервать игру'))
             else:
-                bot.send_message(message.chat.id, 'Город уже был назван! Введите другой',
+                send_message(bot, message.chat.id, 'Город уже был назван! Введите другой',
                                  reply_markup=self.bb.gen_underline_butons('Прервать игру'))
         else:
-            bot.send_message(message.chat.id, 'Извините, я не знаю такого города. Введите другой',
+            send_message(bot, message.chat.id, 'Извините, я не знаю такого города. Введите другой',
                              reply_markup=self.bb.gen_underline_butons('Прервать игру'))
 
     @check_time
@@ -182,7 +183,7 @@ class CapitalsGameManager(object):
 
         if 'прервать' in message.text.lower() or 'прервем' in message.text.lower():
             db.set_game_capitals_mode(message.from_user.id, None)
-            bot.send_message(message.chat.id, 'Хорошо, поиграем в другой раз!',
+            send_message(bot, message.chat.id, 'Хорошо, поиграем в другой раз!',
                              reply_markup=ReplyKeyboardRemove())
             return
 
@@ -204,7 +205,7 @@ class CapitalsGameManager(object):
         db.set_game_capitals_mode(message.from_user.id, 'Вступление')
         if first_time:
             time.sleep(0.5)
-            bot.send_message(message.chat.id, 'Приветствую вас в игре Столицы Мира!')
+            send_message(bot, message.chat.id, 'Приветствую вас в игре Столицы Мира!')
 
         # info_msg1 = 'Правила очень простые:\n' \
         #             'Я называю страну, ты - столицу этой страны :)\n' \
@@ -217,9 +218,9 @@ class CapitalsGameManager(object):
         info_msg2 = 'Начнем игру?'
 
         time.sleep(0.5)
-        bot.send_message(message.chat.id, info_msg1, parse_mode="Markdown")
+        send_message(bot, message.chat.id, info_msg1, parse_mode="Markdown")
         time.sleep(1)
-        bot.send_message(message.chat.id, info_msg2,
+        send_message(bot, message.chat.id, info_msg2,
                          reply_markup=self.bb.gen_underline_butons('Начнем игру', 'Прервать игру'))
 
     def _first_game_capitals_stage(self, message, db, bot):
@@ -241,7 +242,7 @@ class CapitalsGameManager(object):
         # Нажатие на кнопку Не знаю
         if 'не знаю' in message.text.lower() or 'незнаю' in message.text.lower():
             capital = db.return_capital(message.from_user.id)
-            bot.send_message(message.chat.id, '*Правильный ответ: {}*'.format(capital),
+            send_message(bot, message.chat.id, '*Правильный ответ: {}*'.format(capital),
                              reply_markup=ReplyKeyboardRemove(),
                              parse_mode='Markdown')
 
@@ -262,14 +263,14 @@ class CapitalsGameManager(object):
                 else:
                     hide_capital += capital[i]
 
-            bot.send_message(message.chat.id, 'Подсказка: {}'.format(hide_capital),
+            send_message(bot, message.chat.id, 'Подсказка: {}'.format(hide_capital),
                              reply_markup=self.bb.gen_underline_butons('Не знаю', 'Прервать игру'),)
 
             return
 
         # Анализ сообщения пользователя, верную ли столицу он назвал
         if db.is_right_capital(message.from_user.id, message.text):
-            bot.send_message(message.from_user.id, 'Верно!')
+            send_message(bot, message.from_user.id, 'Верно!')
             db.set_capital(message.from_user.id)
             time.sleep(0.5)
 
@@ -282,7 +283,7 @@ class CapitalsGameManager(object):
                 return
 
         else:
-            bot.send_message(message.chat.id, 'Неверно.. Попробуйте ещё раз :) Или сдаетесь?',
+            send_message(bot, message.chat.id, 'Неверно.. Попробуйте ещё раз :) Или сдаетесь?',
                              reply_markup=self.bb.gen_underline_butons('Подсказка', 'Не знаю', 'Прервать игру'))
             return
 
@@ -295,7 +296,7 @@ class CapitalsGameManager(object):
 
         country_name = db.select_random_capital(message.from_user.id)
         time.sleep(0.5)
-        bot.send_message(message.chat.id, '*{} - ?*'.format(country_name),
+        send_message(bot, message.chat.id, '*{} - ?*'.format(country_name),
                          reply_markup=self.bb.gen_underline_butons('Подсказка', 'Не знаю', 'Прервать игру'),
                          parse_mode='Markdown')
 
@@ -308,14 +309,14 @@ class CapitalsGameManager(object):
 
         result = db.get_results_capitals(message.from_user.id)
         if result >= 15:
-            bot.send_message(message.chat.id, 'Поздравляю, вы победили!')
+            send_message(bot, message.chat.id, 'Поздравляю, вы победили!')
 
         else:
-            bot.send_message(message.chat.id, 'К сожалению, вы проиграли..')
+            send_message(bot, message.chat.id, 'К сожалению, вы проиграли..')
 
         db.set_game_capitals_mode(message.from_user.id, None)
-        bot.send_message(message.chat.id, 'Ваш результат: {} из 20'.format(result))
-        bot.send_message(message.chat.id, 'Спасибо за игру!', reply_markup=ReplyKeyboardRemove())
+        send_message(bot, message.chat.id, 'Ваш результат: {} из 20'.format(result))
+        send_message(bot, message.chat.id, 'Спасибо за игру!', reply_markup=ReplyKeyboardRemove())
 
 
 class SpaceQuest(object):
@@ -330,7 +331,7 @@ class SpaceQuest(object):
 
         if 'прервать' in message.text.lower():
             db.set_space_quest_mode(message.from_user.id, None)
-            bot.send_message(message.chat.id, 'Хорошо, доиграем позже :)')
+            send_message(bot, message.chat.id, 'Хорошо, доиграем позже :)')
             return
 
         if not db.get_space_quest_mode(message.from_user.id):

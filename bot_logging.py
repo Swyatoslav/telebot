@@ -47,12 +47,20 @@ class LogManager:
 
             user_info = [message.from_user.first_name, last_user_name, message.from_user.id]
 
-            print('{0}  USER: [{1} {2}]  USER_ID: [{3}]  MESSAGE: [{4}]'.format(
+            print('{0}  CHAT_ID: [{3}]  USER: [{1} {2}]  MESSAGE: [{4}]'.format(
                 time_log, user_info[0], user_info[1], user_info[2], message.text))
 
             func(message)
 
         return wrapper
+
+    def bot_message(self, chat_id, message):
+        """Logging of bot message"""
+
+        t = datetime.now()
+        time_log = t.strftime("[%m-%d-%y %H:%M:%S]")
+
+        print('{}  CHAT_ID: [{}]  USER: [TELEBOT]  MESSAGE: [{}]'.format(time_log, chat_id, message))
 
     @staticmethod
     def write_log_file(func_name, exec_time, user_msg, user_id):
@@ -153,6 +161,14 @@ class LogManager:
             time.sleep(0.5)
             bot.send_message(message.chat.id, '*Аварийный выход из игры "Space quest"*', reply_markup=ReplyKeyboardRemove(),
                              parse_mode='Markdown')
+
+        elif db.get_notes_mode_stage(uid):
+            note_mode = db.get_notes_mode_stage(uid)
+            db.set_notes_mode_stage(uid, None)
+            err_report += 'Note mode: True\nNote stage: {}\n'.format(note_mode)
+            time.sleep(0.5)
+            bot.send_message(message.chat.id, '*Аварийный выход из режима "Создание заметок"*',
+                             reply_markup=ReplyKeyboardRemove(), parse_mode='Markdown')
 
         # Формирование stacktrace
         err_stacktrace = ''.join(traceback.format_exception(etype=type(err), value=err, tb=err.__traceback__))
