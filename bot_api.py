@@ -76,7 +76,7 @@ def callback_query(call):
 
 @bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather', 'game_cities', 'random_5',
                                'glr', 'send_update_message', 'send_user_message', 'game_capitals', 'space_quest',
-                               'note'])
+                               'notes'])
 @db.set_user_info
 @lm.log_message
 def start_message(message):
@@ -149,7 +149,7 @@ def start_message(message):
             elif 'send_user_message' in message.text and db.is_admin_id(message.from_user.id):
                 send_message(bot, 214864371, """""", parse_mode='Markdown')
 
-            elif 'note' in message.text and db.is_admin_id(message.from_user.id):
+            elif 'notes' in message.text.lower():
                 nm.notes_mode(message, db, bot)
 
     except Exception as err:

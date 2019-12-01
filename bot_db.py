@@ -856,7 +856,7 @@ class DBManager:
         if result is None:
             note_id = int(f'1{timestamp}')
         else:
-            note_id = int(f'{result[0] + 1}{timestamp}')
+            note_id = int(f'{result[0] + 1}')
 
         self.cursor.execute("""INSERT INTO admin.user_notes(id, uid, note_head, note_body, note_time) 
         VALUES (%s, %s, %s, %s, %s);""", (note_id, user_id, note_head, None, note_time))

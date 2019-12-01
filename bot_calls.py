@@ -75,7 +75,7 @@ class CallsManager(object):
             sleep(0.3)
 
             if note_info:
-                note_date = note_info[0].strftime('%m.%d %H:%M')
+                note_date = note_info[0].strftime('%Y.%m.%d %H:%M')
                 note_head = note_info[1]
                 note_body = note_info[2]
                 send_message(bot, call.from_user.id, f'*{note_head}*\nВремя создания: {note_date}',
@@ -83,7 +83,9 @@ class CallsManager(object):
 
                 if note_body:
                     sleep(0.5)
-                    send_message(bot, call.from_user.id, note_body, reply_markup=self.bb.gen_underline_butons(*buttons))
+                    send_message(bot, call.from_user.id, f'_{note_body}_',
+                                 reply_markup=self.bb.gen_underline_butons(*buttons),
+                                 parse_mode='Markdown')
 
             else:
                 bot.answer_callback_query(call.id, 'Заметка была удалена')

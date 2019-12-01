@@ -326,6 +326,10 @@ class NotesManager(object):
     """Менеджер по работе с заметками"""
 
     bb = BotButtons()
+    head = 'Заголовок заметки'
+    body = 'Тело заметки'
+    menu = 'Меню'
+    none = None
 
     def notes_mode(self, message, db, bot):
         """Режим заметок"""
@@ -333,18 +337,32 @@ class NotesManager(object):
         menu_buttons = ('Создать заметку', 'Показать заметки', 'Выйти из заметок')
         menu_text = 'Вы находитесь в меню заметок'
 
-        if 'выйти из заметок' in message.text.lower():
-            db.set_notes_mode_stage(message.from_user.id, None)
+        stage = db.get_notes_mode_stage(message.from_user.id)
+
+        if message.text.lower() in ['выйти из заметок', 'прервать']:
+            db.set_notes_mode_stage(message.from_user.id, self.none)
             send_message(bot, message.from_user.id, 'Работа с заметками окончена :)', reply_markup=ReplyKeyboardRemove())
 
             return
 
         elif 'меню' in message.text.lower():
-            db.set_notes_mode_stage(message.from_user.id, 'Меню')
+            db.set_notes_mode_stage(message.from_user.id, self.menu)
             send_message(bot, message.from_user.id, menu_text, reply_markup=self.bb.gen_underline_butons(*menu_buttons))
 
-        elif 'показать заметки' in message.text.lower():
+            return
+
+        elif message.text.lower() == 'создать заметку' and stage not in [self.head, self.body]:
+            note_text = 'Пожалуйста, введите заголовок заметки (не более 30 символов)'
+            note_buttons = ('Меню', 'Показать заметки', 'Выйти из заметок')
+
+            send_message(bot, message.from_user.id, note_text, reply_markup=self.bb.gen_underline_butons(*note_buttons))
+            db.set_notes_mode_stage(message.from_user.id, self.head)
+
+            return
+
+        elif message.text.lower() == 'показать заметки':
             self.get_note_list(message, db, bot)
+            return
 
         stage = db.get_notes_mode_stage(message.from_user.id)
 
@@ -356,6 +374,7 @@ class NotesManager(object):
 
         elif stage == 'Заголовок заметки':
             self.head_note_stage(message, db, bot)
+
         elif stage == 'Тело заметки':
             self.body_note_stage(message, db, bot)
 
@@ -366,39 +385,44 @@ class NotesManager(object):
         buttons = ('Создать заметку', 'Показать заметки', 'Выйти из заметок')
 
         send_message(bot, message.from_user.id, welcome_text, reply_markup=self.bb.gen_underline_butons(*buttons))
-        db.set_notes_mode_stage(message.from_user.id, 'Меню')
+        db.set_notes_mode_stage(message.from_user.id, self.menu)
 
         return
 
     def menu_stage(self, message, db, bot):
         """Стадия 'Меню'"""
 
-        note_text = 'Пожалуйста, введите заголовок заметки (не более 30 символов)'
-        buttons = ("Меню", "Выйти из заметок")
+        note_text = 'Пожалуйста, введите заголовок заметки (не более 50 символов)'
+        buttons = ("Создать заметку", 'Показать заметки', "Выйти из заметок")
 
-        if 'создать заметку' in message.text.lower():
+        if  message.text.lower() == 'создать заметку':
             send_message(bot, message.from_user.id, note_text, reply_markup=self.bb.gen_underline_butons(*buttons))
-            db.set_notes_mode_stage(message.from_user.id, 'Заголовок заметки')
+            db.set_notes_mode_stage(message.from_user.id, self.head)
 
+            return
+
+        else:
+            send_message(bot, message.from_user.id, 'Вы находитесь в меню заметок',
+                         reply_markup=self.bb.gen_underline_butons(*buttons))
             return
 
     def head_note_stage(self, message, db, bot):
         """Стадия 'Заголовок заметки'"""
 
         buttons = ("Меню", "Выйти из заметок")
-        attention_head = 'Заголовок заметки не может быть пустым или превышать размер 30 символов'
+        attention_head = 'Заголовок заметки не может быть пустым или превышать размер 50 символов'
         body_text = 'Введите тело заметки (Не более 500 символов)'
 
         body_button = 'Сохранить пустую заметку'
 
-        if len(message.text) > 30 or self._is_only_whitespaces(message.text):
+        if len(message.text) > 50 or self._is_only_whitespaces(message.text):
             send_message(bot, message.from_user.id, attention_head, reply_markup=self.bb.gen_underline_butons(*buttons))
 
             return
 
         else:
             db.save_note(message.from_user.id, message.text)
-            db.set_notes_mode_stage(message.from_user.id, 'Тело заметки')
+            db.set_notes_mode_stage(message.from_user.id, self.body)
             send_message(bot, message.from_user.id, body_text,
                          reply_markup=self.bb.gen_underline_butons(*buttons, second_row_button=body_button))
 
@@ -424,7 +448,7 @@ class NotesManager(object):
 
         else:
             db.update_note(message.from_user.id, body_text=note_body)
-            db.set_notes_mode_stage(message.from_user.id, 'Меню')
+            db.set_notes_mode_stage(message.from_user.id, self.menu)
             send_message(bot, message.from_user.id, success_text,
                          reply_markup=self.bb.gen_underline_butons(*menu_buttons),
                          parse_mode='Markdown')
@@ -435,19 +459,22 @@ class NotesManager(object):
         """Стадия 'Список заметок'"""
 
         note_list_text = '*Список заметок*'
-        buttons = ("Меню", "Выйти из заметок")
+        buttons = ("Меню", 'Создать заметку', "Выйти из заметок")
         list_buttons = ('Создать заметку', 'Меню', 'Выйти из заметок')
 
         sleep(0.7)
-        send_message(bot, message.from_user.id, note_list_text, reply_markup=self.bb.gen_underline_butons(*buttons),
+        send_message(bot, message.from_user.id, note_list_text, reply_markup=self.bb.gen_underline_butons(*buttons,
+                     second_row_button='Показать заметки'),
                      parse_mode='Markdown')
         result = db.get_all_user_notes(message.from_user.id)
 
         if result:
             for index, note in enumerate(result):
-                send_message(bot, message.chat.id, f'{index + 1}. {note[1]}',
+                send_message(bot, message.chat.id, f'{index + 1}. *{note[1]}*',
                             reply_markup=self.bb.gen_inline_buttons(['Прочитать', f'rnote_{note[2]}'],
-                                                                    ['Удалить', f'dnote_{note[2]}']))
+                                                                    ['Удалить', f'dnote_{note[2]}']),
+                             parse_mode='Markdown')
+
         else:
             send_message(bot, message.chat.id, 'Заметки отсутствуют',
                          reply_markup=self.bb.gen_underline_butons(*list_buttons))
