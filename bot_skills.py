@@ -257,6 +257,7 @@ class MasterOfWeather(object):
         clouds = u'\U00002601'
         snow = u'\U00002744'
         hot = u'\U0001F525'
+        drop = u'\U0001F4A7'
 
         weather_query = {'Облачно с прояснениями': fewClouds,
                          'Малооблачно': fewClouds,
@@ -266,8 +267,12 @@ class MasterOfWeather(object):
                          'Пасмурно': clouds,
                          'Ливень': thunderstorm,
                          'Небольшой снег': snow,
-                         'Снег': f'{snow} {snow}'
+                         'Снег': f'{snow} {snow}',
+                         'Дождь со снегом': f'{drop} {snow}'
                          }
+
+        if not weather_query.get(condition):
+            return ''
 
         return weather_query[condition]
 
@@ -352,7 +357,7 @@ class NotesManager(object):
             return
 
         elif message.text.lower() == 'создать заметку' and stage not in [self.head, self.body]:
-            note_text = 'Пожалуйста, введите заголовок заметки (не более 30 символов)'
+            note_text = 'Пожалуйста, введите заголовок заметки (не более 50 символов)'
             note_buttons = ('Меню', 'Показать заметки', 'Выйти из заметок')
 
             send_message(bot, message.from_user.id, note_text, reply_markup=self.bb.gen_underline_butons(*note_buttons))
@@ -395,7 +400,7 @@ class NotesManager(object):
         note_text = 'Пожалуйста, введите заголовок заметки (не более 50 символов)'
         buttons = ("Создать заметку", 'Показать заметки', "Выйти из заметок")
 
-        if  message.text.lower() == 'создать заметку':
+        if message.text.lower() == 'создать заметку':
             send_message(bot, message.from_user.id, note_text, reply_markup=self.bb.gen_underline_butons(*buttons))
             db.set_notes_mode_stage(message.from_user.id, self.head)
 
@@ -410,7 +415,8 @@ class NotesManager(object):
         """Стадия 'Заголовок заметки'"""
 
         buttons = ("Меню", "Выйти из заметок")
-        attention_head = 'Заголовок заметки не может быть пустым или превышать размер 50 символов'
+        attention_head = 'Заголовок заметки не может быть пустым или превышать размер 50 символов.\n' \
+                         'Пожалуйста, введите заголовок еще раз'
         body_text = 'Введите тело заметки (Не более 500 символов)'
 
         body_button = 'Сохранить пустую заметку'

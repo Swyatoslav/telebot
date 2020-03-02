@@ -98,3 +98,12 @@ class CallsManager(object):
                 bot.answer_callback_query(call.id, f'Заметка "{note_head}" удалена')
             else:
                 bot.answer_callback_query(call.id, 'Заметка уже удалена')
+
+        elif 'enote' in call.data:
+            if note_info:
+                note_head = note_info[1]
+                db.remove_note_by_id(note_id)
+                bot.answer_callback_query(call.id, f'Заметка "{note_head}" удалена')
+            else:
+                bot.answer_callback_query(call.id, 'Заметка уже удалена')
+
