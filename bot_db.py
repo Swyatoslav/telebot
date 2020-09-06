@@ -48,8 +48,7 @@ class DBManager:
         self.dbname = dbname
         self.user = user
         self.password = password
-        self.conn = psycopg2.connect(dbname=self.dbname, user=self.user, password=self.password, host=self.host,
-                                     port='5432')
+        self.conn = psycopg2.connect(database=self.dbname, user=self.user, password=self.password, host=self.host, port='5432')
         self.cursor = self.conn.cursor()
         self.conn.commit()
 
