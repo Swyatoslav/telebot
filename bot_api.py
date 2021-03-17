@@ -78,6 +78,7 @@ def callback_query(call):
 @bot.message_handler(commands=['start', 'help', 'weather', 'qwsa1234', 'new_weather', 'game_cities', 'random_5',
                                'glr', 'send_update_message', 'send_user_message', 'game_capitals', 'space_quest',
                                'notes'])
+
 @db.set_user_info
 @lm.log_message
 def start_message(message):

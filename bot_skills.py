@@ -14,7 +14,7 @@ from functions import send_message
 
 
 class MasterOfWeather(object):
-    """Класс, работающий с парсингом погоды (Мастер над погодой)"""
+    """Класс, работающий с парсингом погоды (Мастер над погодой) """
 
     bb = BotButtons()
     cur_day = date.today().day

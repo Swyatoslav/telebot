@@ -9,7 +9,7 @@ from functions import send_message
 
 
 class CitiesGameManager(object):
-    """Класс для работы с игрой Города"""
+    """Класс для работы с игрой Города """
 
     btn1 = 'Начнем игру'
     btn2 = 'Прервать игру'

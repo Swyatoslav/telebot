@@ -7,7 +7,7 @@ class ConfigManager:
     @staticmethod
     def create_config(path):
         """Метод создает файл конфига
-        :param path - путь до будущего конфига
+        :param path - путь до  будущего конфига
         """
         if not os.path.exists(path):
             config = configparser.ConfigParser()
