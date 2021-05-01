@@ -56,7 +56,7 @@ class DBManager:
         """Метод записывает информацию по ошибке
         :param uid - id пользователя
         :param traceback - traceback ошибки
-        :param err_info - общая информация о пользователе и ошибке
+        :param err_info - общая информация о пользователе и ошибке123
         """
 
         self.cursor.execute("SELECT id from admin.error_reports order by id desc limit 1")
